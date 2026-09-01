@@ -4,13 +4,19 @@
     "slug": "sehatkosh",
     "scheme": "sehatkosh",
     "userInterfaceStyle": "automatic",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "orientation": "portrait",
     "android": {
       "package": "com.sehatkosh.app"
     },
     "ios": {
       "bundleIdentifier": "com.sehatkosh.app"
-    }
+    },
+    "plugins": [
+      "expo-router"
+    ]
   }
 }

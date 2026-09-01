@@ -1,0 +1,18 @@
+{
+  "name": "sehatkosh",
+  "private": true,
+  "scripts": {
+    "dev:mobile": "turbo run dev --filter=@sehatkosh/mobile",
+    "dev:web": "turbo run dev --filter=@sehatkosh/doctor-web",
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0",
+    "prettier": "^3.3.0",
+    "typescript": "^5.5.4"
+  },
+  "packageManager": "pnpm@9.7.0"
+}

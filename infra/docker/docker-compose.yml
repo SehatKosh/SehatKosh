@@ -1,0 +1,61 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sehatkosh-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sehatkosh_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password123}
+      POSTGRES_DB: ${POSTGRES_DB:-sehatkosh_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: sehatkosh-neo4j
+    restart: always
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-secure_neo4j_password}
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - neo4j_data:/data
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: sehatkosh-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3
+      - DEFAULT_REGION=ap-southeast-1
+    volumes:
+      - localstack_data:/var/lib/localstack
+
+  backend:
+    build:
+      context: ../../services/backend
+      dockerfile: Dockerfile
+    container_name: sehatkosh-backend
+    restart: on-failure
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://sehatkosh_admin:secure_password123@postgres:5432/sehatkosh_db
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=secure_neo4j_password
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - AWS_DEFAULT_REGION=ap-southeast-1
+    depends_on:
+      - postgres
+      - neo4j
+      - localstack
+
+volumes:
+  postgres_data:
+  neo4j_data:
+  localstack_data:

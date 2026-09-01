@@ -1,0 +1,10 @@
+{
+  "name": "@sehatkosh/tailwind-config",
+  "version": "0.0.1",
+  "private": true,
+  "main": "tailwind.config.js",
+  "devDependencies": {
+    "tailwindcss": "^3.4.10",
+    "tailwindcss-animate": "^1.0.7"
+  }
+}

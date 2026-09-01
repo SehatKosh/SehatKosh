@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "SehatKosh",
+    "slug": "sehatkosh",
+    "scheme": "sehatkosh",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["ios", "android"],
+    "orientation": "portrait",
+    "android": {
+      "package": "com.sehatkosh.app"
+    },
+    "ios": {
+      "bundleIdentifier": "com.sehatkosh.app"
+    }
+  }
+}

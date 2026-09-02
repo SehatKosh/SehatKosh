@@ -1,5 +1,5 @@
 import { Tabs } from "expo-router";
-import { Activity, FolderHeart, MessageSquarePulse, Plus, SlidersHorizontal } from "lucide-react-native";
+import { Activity, FolderHeart, MessageSquareMore, Plus, SlidersHorizontal } from "lucide-react-native";
 import { TouchableOpacity, View } from "react-native";
 import { useIntakeActions } from "../_overlays";
 
@@ -27,7 +27,7 @@ export default function TabLayout() {
         name="chat"
         options={{
           title: "Assistant",
-          tabBarIcon: ({ color, size }) => <MessageSquarePulse color={color} size={size} strokeWidth={2.2} />,
+          tabBarIcon: ({ color, size }) => <MessageSquareMore color={color} size={size} strokeWidth={2.2} />,
         }}
       />
       <Tabs.Screen

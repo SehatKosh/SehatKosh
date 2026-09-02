@@ -1,0 +1,9 @@
+import { useState } from "react";
+import { router } from "expo-router";
+import { Check, ChevronLeft } from "lucide-react-native";
+import { Text, TextInput, TouchableOpacity, View } from "react-native";
+
+export default function SignupScreen() {
+  const [password, setPassword] = useState("");
+  return <View className="flex-1 bg-white px-6 pt-16"><TouchableOpacity onPress={() => router.back()} className="h-11 w-11 items-center justify-center"><ChevronLeft color="#475569" size={24} /></TouchableOpacity><Text className="mt-8 text-3xl font-bold text-slate-900">Create your ledger</Text><Text className="mt-2 text-base leading-6 text-slate-500">Your records stay organized, private, and ready when you need them.</Text><Text className="mb-2 mt-10 text-sm font-semibold text-slate-700">Full name</Text><TextInput placeholder="Muhammad Ahsan" placeholderTextColor="#94A3B8" className="rounded-xl border border-slate-200 px-4 py-3 text-slate-900" /><Text className="mb-2 mt-4 text-sm font-semibold text-slate-700">Email</Text><TextInput autoCapitalize="none" keyboardType="email-address" placeholder="you@example.com" placeholderTextColor="#94A3B8" className="rounded-xl border border-slate-200 px-4 py-3 text-slate-900" /><Text className="mb-2 mt-4 text-sm font-semibold text-slate-700">Password</Text><TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder="At least 8 characters" placeholderTextColor="#94A3B8" className="rounded-xl border border-slate-200 px-4 py-3 text-slate-900" /><TouchableOpacity disabled={password.length < 8} onPress={() => router.replace("/(tabs)/activity")} className={`mt-7 flex-row items-center justify-center rounded-xl py-4 ${password.length >= 8 ? "bg-sky-600" : "bg-slate-200"}`}><Check color={password.length >= 8 ? "#FFFFFF" : "#94A3B8"} size={18} /><Text className={`ml-2 font-bold ${password.length >= 8 ? "text-white" : "text-slate-400"}`}>Create account</Text></TouchableOpacity></View>;
+}

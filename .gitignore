@@ -4,6 +4,14 @@ dist/
 .next/
 out/
 .expo/
+.expo-shared/
+android/
+ios/
+*.jks
+*.keystore
+*.p8
+*.p12
+*.pem
 *.tsbuildinfo
 .turbo/
 .env

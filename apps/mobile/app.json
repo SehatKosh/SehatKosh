@@ -3,12 +3,14 @@
     "name": "SehatKosh",
     "slug": "sehatkosh",
     "scheme": "sehatkosh",
+    "version": "1.0.0",
     "userInterfaceStyle": "automatic",
     "platforms": [
       "ios",
       "android"
     ],
     "orientation": "portrait",
+    "newArchEnabled": true,
     "android": {
       "package": "com.sehatkosh.app"
     },
@@ -16,7 +18,8 @@
       "bundleIdentifier": "com.sehatkosh.app"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-camera"
     ]
   }
 }

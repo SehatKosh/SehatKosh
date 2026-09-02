@@ -1,8 +1,8 @@
-import { BottomSheet, BottomSheetTextInput, BottomSheetView } from "@gorhom/bottom-sheet";
+import BottomSheet, { BottomSheetTextInput, BottomSheetView } from "@gorhom/bottom-sheet";
 import { useLocalSearchParams, router } from "expo-router";
 import { AlertTriangle, Check, Plus, Trash2, X } from "lucide-react-native";
 import { useRef, useState } from "react";
-import { Image, Pressable, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Image, Pressable, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
 type Medication = { name: string; strength: string; frequency: string; duration: string };
 

@@ -1,7 +1,7 @@
 import { Tabs } from "expo-router";
 import { Activity, FolderHeart, MessageSquareMore, Plus, SlidersHorizontal } from "lucide-react-native";
 import { TouchableOpacity, View } from "react-native";
-import { useIntakeActions } from "../_overlays";
+import { useIntakeActions } from "../../components/GlobalOverlays";
 
 export default function TabLayout() {
   const { openIntakeActionSheet } = useIntakeActions();
@@ -34,8 +34,8 @@ export default function TabLayout() {
         name="intake"
         options={{
           title: "Intake",
-          tabBarButton: (props) => (
-            <TouchableOpacity {...props} className="-mt-5 flex-1 items-center justify-center" accessibilityLabel="Start clinical intake">
+          tabBarButton: ({ onPress, accessibilityLabel }) => (
+            <TouchableOpacity onPress={onPress} className="-mt-5 flex-1 items-center justify-center" accessibilityLabel={accessibilityLabel ?? "Start clinical intake"}>
               <View className="h-16 w-16 items-center justify-center rounded-full border-4 border-white bg-sky-600 shadow-lg">
                 <Plus color="#FFFFFF" size={30} strokeWidth={2.5} />
               </View>
@@ -44,7 +44,7 @@ export default function TabLayout() {
         }}
         listeners={{
           tabPress: (event) => {
-            event.preventDefault();
+            (event as unknown as { preventDefault: () => void }).preventDefault();
             openIntakeActionSheet();
           },
         }}

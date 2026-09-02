@@ -4,7 +4,7 @@ import { Stack } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
-import { GlobalOverlays } from "./_overlays";
+import { GlobalOverlays } from "../components/GlobalOverlays";
 
 const queryClient = new QueryClient();
 

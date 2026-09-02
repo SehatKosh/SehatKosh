@@ -1,6 +1,9 @@
-import { View, Text } from "react-native";
+import { useState } from "react";
+import { Search, ShieldCheck } from "lucide-react-native";
+import { View, Text, TextInput, TouchableOpacity } from "react-native";
 
 export default function RecordsScreen() {
+  const [profile, setProfile] = useState(false);
   return (
     <View className="flex-1 bg-slate-50 p-6 pt-14">
       <Text className="text-3xl font-bold text-slate-900">Records</Text>

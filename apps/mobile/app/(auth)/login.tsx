@@ -1,0 +1,11 @@
+import { useState } from "react";
+import { router } from "expo-router";
+import { ArrowRight, Fingerprint } from "lucide-react-native";
+import { Text, TextInput, TouchableOpacity, View } from "react-native";
+
+export default function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const valid = /\S+@\S+\.\S+/.test(email) && password.length >= 8;
+  return <View className="flex-1 bg-white px-6 pt-24"><Text className="text-sm font-bold tracking-widest text-sky-600">SEHATKOSH</Text><Text className="mt-5 text-3xl font-bold text-slate-900">Your Health, Unified</Text><Text className="mt-2 text-base leading-6 text-slate-500">Clinical-grade personal health ledger.</Text><View className="mt-10 rounded-2xl border border-slate-200 bg-white p-5"><Text className="text-sm font-semibold text-slate-700">Email or Medical ID</Text><TextInput value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" placeholder="you@example.com" placeholderTextColor="#94A3B8" className="mt-2 rounded-xl border border-slate-200 px-4 py-3 text-slate-900" /><Text className="mb-2 mt-4 text-sm font-semibold text-slate-700">Password</Text><TextInput value={password} onChangeText={setPassword} secureTextEntry placeholder="At least 8 characters" placeholderTextColor="#94A3B8" className="rounded-xl border border-slate-200 px-4 py-3 text-slate-900" /><TouchableOpacity disabled={!valid} onPress={() => router.replace("/(tabs)/activity")} className={`mt-5 flex-row items-center justify-center rounded-xl py-4 ${valid ? "bg-sky-600" : "bg-slate-200"}`}><Text className={`mr-2 font-bold ${valid ? "text-white" : "text-slate-400"}`}>Continue</Text><ArrowRight color={valid ? "#FFFFFF" : "#94A3B8"} size={18} /></TouchableOpacity><TouchableOpacity className="mt-4 flex-row items-center justify-center rounded-xl border border-slate-200 py-3"><Fingerprint color="#0284C7" size={18} /><Text className="ml-2 text-sm font-semibold text-sky-700">Sign in with Biometrics</Text></TouchableOpacity></View><TouchableOpacity onPress={() => router.push("/(auth)/signup")} className="mt-8"><Text className="text-center text-sm text-slate-500">New to SehatKosh? <Text className="font-bold text-sky-600">Create an account</Text></Text></TouchableOpacity></View>;
+}

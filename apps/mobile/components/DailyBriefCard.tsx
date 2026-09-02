@@ -1,0 +1,4 @@
+import { Sparkles } from "lucide-react-native";
+import { Text, TouchableOpacity, View } from "react-native";
+
+export function DailyBriefCard({ onViewTimeline }: { onViewTimeline?: () => void }) { return <View className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4"><View className="flex-row items-center gap-2"><Sparkles color="#10B981" size={17} /><Text className="text-xs font-bold tracking-wide text-emerald-700">DAILY CLINICAL SUMMARY</Text></View><Text className="mt-3 text-sm leading-5 text-emerald-900">• Resting heart rate is within your normal range today.{"\n"}• Hydration and medication timing look consistent.</Text><TouchableOpacity onPress={onViewTimeline} className="mt-3 self-end"><Text className="text-sm font-bold text-emerald-700">View Timeline</Text></TouchableOpacity></View>; }

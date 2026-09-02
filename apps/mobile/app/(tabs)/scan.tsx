@@ -2,6 +2,7 @@ import { useState } from "react";
 import { View, Text, TouchableOpacity, Image, ActivityIndicator } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Camera } from "lucide-react-native";
+import { router } from "expo-router";
 
 export default function ScanScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -17,15 +18,17 @@ export default function ScanScreen() {
     });
 
     if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
-      processOCR();
+      const capturedUri = result.assets[0].uri;
+      setImageUri(capturedUri);
+      processOCR(capturedUri);
     }
   };
 
-  const processOCR = () => {
+  const processOCR = (capturedUri: string) => {
     setProcessing(true);
     setTimeout(() => {
       setProcessing(false);
+      router.push({ pathname: "/intake/ocr-verify", params: { imageUri: capturedUri } });
     }, 2500);
   };
 

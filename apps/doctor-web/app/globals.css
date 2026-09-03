@@ -1,30 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
+  /* Base canvas */
   --background: 0 0% 100%;
+  --background-subtle: 210 40% 98%;
+  --surface-card: 0 0% 100%;
+
+  /* Text */
   --foreground: 222.2 84% 4.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
+  --text-primary: 222.2 84% 4.9%;
+  --text-secondary: 215.4 16.3% 46.9%;
+
+  /* Interactive */
   --primary: 221.2 83.2% 53.3%;
   --primary-foreground: 210 40% 98%;
+  --primary-hover: 224.3 76.3% 48%;
+
+  /* Semantic states */
+  --success: 142.1 76.2% 36.3%;
+  --success-subtle: 138.5 76.5% 96.7%;
+  --warning: 38 92% 50%;
+  --warning-subtle: 48 96% 89%;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-subtle: 0 85.7% 97.3%;
+  --destructive-foreground: 210 40% 98%;
+
+  /* Components */
   --secondary: 210 40% 96.1%;
   --secondary-foreground: 222.2 47.4% 11.2%;
   --muted: 210 40% 96.1%;
   --muted-foreground: 215.4 16.3% 46.9%;
   --accent: 210 40% 96.1%;
   --accent-foreground: 222.2 47.4% 11.2%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+
+  /* Structure */
   --border: 214.3 31.8% 91.4%;
   --input: 214.3 31.8% 91.4%;
   --ring: 221.2 83.2% 53.3%;
   --radius: 0.5rem;
 }
 
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  background: #f8fafc;
-  color: #0f172a;
+  background-color: hsl(var(--background-subtle));
+  color: hsl(var(--text-primary));
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Clinical monospace for metrics, codes, timestamps */
+.font-clinical {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Smooth transitions for interactive elements */
+* {
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Prevent transition on layout elements */
+html, body, #__next {
+  transition: none;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(var(--background-subtle));
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--text-secondary));
+}
+
+/* Focus outline reset — handled by ring utilities */
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
 }

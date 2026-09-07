@@ -191,6 +191,48 @@ export const MOCK_PATIENTS: Patient[] = [
     lastHR: 68,
     lastSpO2: 94,
   },
+  {
+    id: "pat-004",
+    name: "Fatima Noor",
+    initials: "FN",
+    age: 28,
+    gender: "Female",
+    bloodGroup: "AB+",
+    medicalId: "SK-3310-A",
+    phone: "+92 316 7890123",
+    allergies: [],
+    chronicConditions: ["Migraine (Chronic)"],
+    lastEncounterDate: "2026-08-10",
+    lastEncounterReason: "Migraine Prophylaxis Review",
+    activeDrugCount: 1,
+    hasContraindication: false,
+    accessStatus: "active",
+    accessExpiresAt: new Date(Date.now() + 55 * 60 * 1000).toISOString(),
+    vitalsStatus: "normal",
+    lastHR: 72,
+    lastSpO2: 99,
+  },
+  {
+    id: "pat-005",
+    name: "Bilal Sheikh",
+    initials: "BS",
+    age: 32,
+    gender: "Male",
+    bloodGroup: "O-",
+    medicalId: "SK-1102-B",
+    phone: "+92 301 5551234",
+    allergies: [],
+    chronicConditions: [],
+    lastEncounterDate: "2026-08-28",
+    lastEncounterReason: "Appendectomy — Post-op Day 7 Check",
+    activeDrugCount: 2,
+    hasContraindication: false,
+    accessStatus: "active",
+    accessExpiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+    vitalsStatus: "normal",
+    lastHR: 80,
+    lastSpO2: 98,
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -427,4 +469,243 @@ export function getInteractionsByPatientId(patientId: string): DrugInteraction[]
 
 export async function fetchWithDelay<T>(data: T, delayMs = 350): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(data), delayMs));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MULTI-ROLE MOCK DATA — Doctor Queue, Staff, Audit Logs, Research Cases
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type UserRole = "doctor" | "registrar" | "admin" | "researcher";
+
+export interface QueueItem {
+  id: string;
+  queueNumber: number;
+  patientId: string;
+  patientName: string;
+  patientMrn: string;
+  chiefComplaint: string;
+  waitMinutes: number;
+  consentExpiresAt: string;
+  status: "waiting" | "in_consultation" | "completed";
+}
+
+export interface HospitalStaff {
+  id: string;
+  name: string;
+  role: UserRole;
+  department: string;
+  roomNumber?: string;
+  hospitalName: string;
+  onDuty: boolean;
+  email: string;
+}
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  physicianName: string;
+  physicianId: string;
+  patientMrn: string;
+  patientCnic: string;
+  action: "Dossier Viewed" | "Document Zoomed" | "Summary Copied" | "Break-Glass Override" | "Consent Dispatched" | "Record Ingested";
+  severity: "normal" | "high";
+  ipAddress: string;
+}
+
+export interface AnonymizedCase {
+  caseId: string;
+  subjectHash: string;
+  ageBracket: string;
+  gender: "Male" | "Female";
+  primaryCondition: string;
+  icd10Code: string;
+  prescribedMolecules: string[];
+  encounterCount: number;
+  regimenLengthDays: number;
+  outcome: "Resolved" | "Maintenance" | "Escalated";
+  soap: {
+    subjective: string;
+    objective: string;
+    assessment: string;
+    plan: string;
+  };
+}
+
+export interface AdminMetrics {
+  activeSessions: number;
+  registeredPatients: number;
+  breakGlassToday: number;
+  ingestQueue: number;
+}
+
+// ── Queue Items ──────────────────────────────────────────────────────────────
+
+export const MOCK_QUEUE_ITEMS: QueueItem[] = [
+  {
+    id: "q-001", queueNumber: 1, patientId: "pat-001",
+    patientName: "Muhammad Ahsan", patientMrn: "SK-8921-X",
+    chiefComplaint: "Chest tightness for 3 days, mild shortness of breath",
+    waitMinutes: 12,
+    consentExpiresAt: new Date(Date.now() + 3 * 60 * 60 * 1000 + 42 * 60 * 1000).toISOString(),
+    status: "waiting",
+  },
+  {
+    id: "q-002", queueNumber: 2, patientId: "pat-002",
+    patientName: "Sara Khan", patientMrn: "SK-4523-Y",
+    chiefComplaint: "Fatigue and increased thirst — diabetes review",
+    waitMinutes: 26,
+    consentExpiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000 + 15 * 60 * 1000).toISOString(),
+    status: "waiting",
+  },
+  {
+    id: "q-003", queueNumber: 3, patientId: "pat-003",
+    patientName: "Ahmed Raza", patientMrn: "SK-7892-Z",
+    chiefComplaint: "COPD follow-up, worsening exertional dyspnea",
+    waitMinutes: 41,
+    consentExpiresAt: new Date(Date.now() + 1 * 60 * 60 * 1000 + 8 * 60 * 1000).toISOString(),
+    status: "waiting",
+  },
+  {
+    id: "q-004", queueNumber: 4, patientId: "pat-004",
+    patientName: "Fatima Noor", patientMrn: "SK-3310-A",
+    chiefComplaint: "Recurrent migraine, requesting new prophylactic",
+    waitMinutes: 55,
+    consentExpiresAt: new Date(Date.now() + 55 * 60 * 1000).toISOString(),
+    status: "waiting",
+  },
+  {
+    id: "q-005", queueNumber: 5, patientId: "pat-005",
+    patientName: "Bilal Sheikh", patientMrn: "SK-1102-B",
+    chiefComplaint: "Post-op wound check — appendectomy day 7",
+    waitMinutes: 68,
+    consentExpiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+    status: "in_consultation",
+  },
+];
+
+// ── Hospital Staff ────────────────────────────────────────────────────────────
+
+export const MOCK_HOSPITAL_STAFF: HospitalStaff[] = [
+  { id: "dr-001", name: "Dr. Tariq Khan", role: "doctor", department: "Cardiology", roomNumber: "Room 4", hospitalName: "Shifa International Hospital", onDuty: true, email: "tariq.khan@shifa.edu.pk" },
+  { id: "dr-002", name: "Dr. Ayesha Malik", role: "doctor", department: "Endocrinology", roomNumber: "Room 7", hospitalName: "Shifa International Hospital", onDuty: true, email: "ayesha.malik@shifa.edu.pk" },
+  { id: "dr-003", name: "Dr. Usman Farooq", role: "doctor", department: "Pulmonology", roomNumber: "Room 2", hospitalName: "Shifa International Hospital", onDuty: false, email: "usman.farooq@shifa.edu.pk" },
+  { id: "dr-004", name: "Dr. Zainab Hussain", role: "doctor", department: "Neurology", roomNumber: "Room 9", hospitalName: "Shifa International Hospital", onDuty: true, email: "zainab.h@shifa.edu.pk" },
+  { id: "dr-005", name: "Dr. Kamran Iqbal", role: "doctor", department: "General Surgery", roomNumber: "Room 1", hospitalName: "Shifa International Hospital", onDuty: false, email: "kamran.i@shifa.edu.pk" },
+  { id: "reg-001", name: "Sana Perveen", role: "registrar", department: "Front Desk", hospitalName: "Shifa International Hospital", onDuty: true, email: "sana.p@shifa.edu.pk" },
+  { id: "reg-002", name: "Omer Siddiqui", role: "registrar", department: "Front Desk", hospitalName: "Shifa International Hospital", onDuty: false, email: "omer.s@shifa.edu.pk" },
+];
+
+// ── Audit Logs ────────────────────────────────────────────────────────────────
+
+export const MOCK_AUDIT_LOGS: AuditLog[] = [
+  { id: "log-001", timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(), physicianName: "Dr. Tariq Khan", physicianId: "dr-001", patientMrn: "SK-8921-X", patientCnic: "37405-1234567-1", action: "Dossier Viewed", severity: "normal", ipAddress: "192.168.1.45" },
+  { id: "log-002", timestamp: new Date(Date.now() - 12 * 60 * 1000).toISOString(), physicianName: "Dr. Tariq Khan", physicianId: "dr-001", patientMrn: "SK-8921-X", patientCnic: "37405-1234567-1", action: "Summary Copied", severity: "normal", ipAddress: "192.168.1.45" },
+  { id: "log-003", timestamp: new Date(Date.now() - 28 * 60 * 1000).toISOString(), physicianName: "Dr. Ayesha Malik", physicianId: "dr-002", patientMrn: "SK-4523-Y", patientCnic: "42201-9876543-2", action: "Dossier Viewed", severity: "normal", ipAddress: "192.168.1.62" },
+  { id: "log-004", timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(), physicianName: "Dr. Usman Farooq", physicianId: "dr-003", patientMrn: "SK-7892-Z", patientCnic: "35202-4561234-3", action: "Break-Glass Override", severity: "high", ipAddress: "192.168.1.33" },
+  { id: "log-005", timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(), physicianName: "Sana Perveen", physicianId: "reg-001", patientMrn: "SK-3310-A", patientCnic: "61101-7890123-4", action: "Consent Dispatched", severity: "normal", ipAddress: "192.168.1.10" },
+  { id: "log-006", timestamp: new Date(Date.now() - 1.5 * 60 * 60 * 1000).toISOString(), physicianName: "Dr. Tariq Khan", physicianId: "dr-001", patientMrn: "SK-4523-Y", patientCnic: "42201-9876543-2", action: "Document Zoomed", severity: "normal", ipAddress: "192.168.1.45" },
+  { id: "log-007", timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), physicianName: "Sana Perveen", physicianId: "reg-001", patientMrn: "SK-1102-B", patientCnic: "42301-5551234-5", action: "Record Ingested", severity: "normal", ipAddress: "192.168.1.10" },
+  { id: "log-008", timestamp: new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString(), physicianName: "Dr. Zainab Hussain", physicianId: "dr-004", patientMrn: "SK-8921-X", patientCnic: "37405-1234567-1", action: "Break-Glass Override", severity: "high", ipAddress: "192.168.1.88" },
+  { id: "log-009", timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), physicianName: "Dr. Ayesha Malik", physicianId: "dr-002", patientMrn: "SK-7892-Z", patientCnic: "35202-4561234-3", action: "Dossier Viewed", severity: "normal", ipAddress: "192.168.1.62" },
+  { id: "log-010", timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(), physicianName: "Omer Siddiqui", physicianId: "reg-002", patientMrn: "SK-3310-A", patientCnic: "61101-7890123-4", action: "Consent Dispatched", severity: "normal", ipAddress: "192.168.1.14" },
+  { id: "log-011", timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), physicianName: "Dr. Kamran Iqbal", physicianId: "dr-005", patientMrn: "SK-1102-B", patientCnic: "42301-5551234-5", action: "Dossier Viewed", severity: "normal", ipAddress: "192.168.1.77" },
+  { id: "log-012", timestamp: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(), physicianName: "Dr. Tariq Khan", physicianId: "dr-001", patientMrn: "SK-8921-X", patientCnic: "37405-1234567-1", action: "Summary Copied", severity: "normal", ipAddress: "192.168.1.45" },
+];
+
+// ── Admin Metrics ─────────────────────────────────────────────────────────────
+
+export const MOCK_ADMIN_METRICS: AdminMetrics = {
+  activeSessions: 7,
+  registeredPatients: 3842,
+  breakGlassToday: 2,
+  ingestQueue: 14,
+};
+
+// ── Anonymized Research Cases ─────────────────────────────────────────────────
+
+export const MOCK_ANONYMIZED_CASES: AnonymizedCase[] = [
+  {
+    caseId: "case-001", subjectHash: "SUBJECT-ANON-9042", ageBracket: "20–25", gender: "Male",
+    primaryCondition: "Acute Bacterial Bronchitis", icd10Code: "J20.9",
+    prescribedMolecules: ["Amoxicillin", "Paracetamol", "Salbutamol"],
+    encounterCount: 4, regimenLengthDays: 7, outcome: "Resolved",
+    soap: {
+      subjective: "Subject reports productive cough with mucopurulent sputum, mild chest tightness, fever resolved after 48h.",
+      objective: "Bilateral basal crackles. SpO₂ 96%. HR 92 bpm. Temp 37.2°C. BP 138/88 mmHg.",
+      assessment: "Acute bacterial bronchitis (J20.9). Differentials: CAP, viral URTI, asthma exacerbation.",
+      plan: "Amoxicillin 500mg TDS × 7d. Salbutamol MDI 2 puffs QID × 5d. Follow-up 7 days. Culture sensitivity ordered.",
+    },
+  },
+  {
+    caseId: "case-002", subjectHash: "SUBJECT-ANON-3817", ageBracket: "30–35", gender: "Female",
+    primaryCondition: "Type 2 Diabetes Mellitus — Suboptimal Control", icd10Code: "E11.9",
+    prescribedMolecules: ["Metformin", "Atorvastatin"],
+    encounterCount: 6, regimenLengthDays: 90, outcome: "Maintenance",
+    soap: {
+      subjective: "Subject reports afternoon fatigue and polydipsia. Diet adherence poor this quarter. HbA1c 7.4%.",
+      objective: "Alert and oriented. No peripheral edema. Foot exam: intact sensation, no ulcers. BP 124/82.",
+      assessment: "T2DM suboptimal control (E11.9). Differentials: hypothyroidism-related fatigue, anaemia.",
+      plan: "Metformin XR 1000mg BD ongoing. Atorvastatin 20mg OD. HbA1c repeat 3 months. Low GI diet counselling.",
+    },
+  },
+  {
+    caseId: "case-003", subjectHash: "SUBJECT-ANON-7291", ageBracket: "55–60", gender: "Male",
+    primaryCondition: "COPD GOLD Stage II", icd10Code: "J44.1",
+    prescribedMolecules: ["Tiotropium", "Budesonide", "Formoterol", "Salbutamol"],
+    encounterCount: 9, regimenLengthDays: 365, outcome: "Maintenance",
+    soap: {
+      subjective: "Worsening exertional dyspnea over past month. Increased sputum production. No haemoptysis.",
+      objective: "Reduced air entry bilaterally. FEV1 62% predicted. SpO₂ 94%. RR 22/min.",
+      assessment: "COPD GOLD Stage II exacerbation (J44.1). Spirometry confirms moderate obstruction.",
+      plan: "Continue Tiotropium 18mcg OD. Add Budesonide/Formoterol 160/4.5mcg BD. Pulmonary rehab referral.",
+    },
+  },
+  {
+    caseId: "case-004", subjectHash: "SUBJECT-ANON-5533", ageBracket: "25–30", gender: "Female",
+    primaryCondition: "Essential Hypertension", icd10Code: "I10",
+    prescribedMolecules: ["Amlodipine", "Ramipril"],
+    encounterCount: 3, regimenLengthDays: 180, outcome: "Maintenance",
+    soap: {
+      subjective: "Routine BP monitoring. Subject reports occasional headaches. No visual disturbances.",
+      objective: "BP 148/94 mmHg. HR 78 bpm. No papilloedema. Fundoscopy normal.",
+      assessment: "Essential hypertension, Stage 1 (I10). White-coat effect possible.",
+      plan: "Amlodipine 5mg OD. Ramipril 5mg OD. Home BP diary. Lifestyle: DASH diet, 30-min walk.",
+    },
+  },
+  {
+    caseId: "case-005", subjectHash: "SUBJECT-ANON-1204", ageBracket: "40–45", gender: "Male",
+    primaryCondition: "Community-Acquired Pneumonia", icd10Code: "J18.9",
+    prescribedMolecules: ["Ceftriaxone", "Azithromycin"],
+    encounterCount: 2, regimenLengthDays: 10, outcome: "Resolved",
+    soap: {
+      subjective: "High-grade fever 39.1°C, rigors, productive cough brown sputum, pleuritic chest pain right side.",
+      objective: "Dullness to percussion right base. CXR: right lower lobe consolidation. WBC 14.2×10³/µL.",
+      assessment: "CAP right lower lobe (J18.9). Moderate severity — CURB-65 score 2. Admission warranted.",
+      plan: "IV Ceftriaxone 1g OD × 5d then oral. Azithromycin 500mg OD × 5d. IV fluids. O₂ prn.",
+    },
+  },
+  {
+    caseId: "case-006", subjectHash: "SUBJECT-ANON-8840", ageBracket: "60–65", gender: "Female",
+    primaryCondition: "Osteoarthritis — Knee Bilateral", icd10Code: "M17.1",
+    prescribedMolecules: ["Celecoxib", "Paracetamol", "Glucosamine"],
+    encounterCount: 5, regimenLengthDays: 240, outcome: "Maintenance",
+    soap: {
+      subjective: "Bilateral knee pain worsening on stairs. Morning stiffness < 30 min. Uses walking aid.",
+      objective: "Crepitus bilateral knees. Limited flexion 110°. X-ray: joint space narrowing, osteophytes.",
+      assessment: "Primary osteoarthritis bilateral knees (M17.1). Moderate functional impairment.",
+      plan: "Celecoxib 200mg OD with food. Paracetamol 1g QID PRN. Physiotherapy referral. Weight management.",
+    },
+  },
+];
+
+export function getAnonymizedCaseById(caseId: string): AnonymizedCase | undefined {
+  return MOCK_ANONYMIZED_CASES.find((c) => c.caseId === caseId);
+}
+
+export function getQueueForDoctor(): QueueItem[] {
+  return MOCK_QUEUE_ITEMS;
+}
+
+export function getOnDutyDoctors(): HospitalStaff[] {
+  return MOCK_HOSPITAL_STAFF.filter((s) => s.role === "doctor" && s.onDuty);
 }

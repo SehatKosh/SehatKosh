@@ -7,8 +7,8 @@ const makeQueryClient = () =>
   new QueryClient({
     defaultOptions: {
       queries: {
-        staleTime: 5 * 60 * 1000, // 5 minutes per spec
-        gcTime: 10 * 60 * 1000, // 10 minutes garbage collection
+        staleTime: 5 * 60 * 1000,
+        gcTime: 10 * 60 * 1000,
         retry: false,
       },
     },
@@ -18,10 +18,8 @@ let browserQueryClient: QueryClient | undefined;
 
 function getQueryClient() {
   if (typeof window === "undefined") {
-    // Server: always new client
     return makeQueryClient();
   }
-  // Browser: reuse singleton
   if (!browserQueryClient) browserQueryClient = makeQueryClient();
   return browserQueryClient;
 }

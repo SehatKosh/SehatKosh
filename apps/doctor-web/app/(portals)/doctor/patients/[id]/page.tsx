@@ -3,15 +3,10 @@
 import React, { useState, use } from "react";
 import { useRouter } from "next/navigation";
 import {
-  FileText,
-  FileSearch,
-  Activity,
-  ShieldAlert,
-  AlertTriangle,
-  RefreshCw,
-  Lock,
+  FileText, FileSearch, Activity, ShieldAlert, AlertTriangle, RefreshCw, Lock,
 } from "lucide-react";
-import { PatientBanner } from "@/components/PatientBanner";
+import { PatientHeader } from "@/components/doctor/PatientHeader";
+import { ClinicalSummaryCard } from "@/components/doctor/ClinicalSummaryCard";
 import { TimelineFeed } from "@/components/TimelineFeed";
 import { SoapViewer } from "@/components/SoapViewer";
 import { DocumentVisualizer } from "@/components/DocumentVisualizer";
@@ -21,14 +16,13 @@ import { Button } from "@/components/ui/button";
 import { usePatient } from "@/hooks/usePatient";
 import { usePatientVitals } from "@/hooks/usePatientVitals";
 import { useConsentSession } from "@/hooks/useConsentSession";
-import type { Encounter } from "@/lib/mockData";
 import { RequestAccessModal } from "@/components/RequestAccessModal";
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export default function PatientDossierPage({ params }: PageProps) {
+export default function DoctorDossierPage({ params }: PageProps) {
   const { id } = use(params);
   const router = useRouter();
 
@@ -55,29 +49,32 @@ export default function PatientDossierPage({ params }: PageProps) {
         <AlertTriangle className="h-10 w-10 text-red-500" />
         <h2 className="text-lg font-bold text-foreground">Patient Not Found</h2>
         <p className="text-xs text-muted-foreground">The requested medical record could not be loaded.</p>
-        <Button size="sm" onClick={() => router.push("/")}>Return to Roster</Button>
+        <Button size="sm" onClick={() => router.push("/doctor/queue")}>Return to Queue</Button>
       </div>
     );
   }
 
   const { patient, encounters, interactions } = dossier;
   const selectedEncounter = encounters.find((e) => e.id === selectedEncounterId) ?? encounters[0];
-
   const isLockedOut = consentSession.isExpired || patient.accessStatus === "expired";
 
   return (
     <div className="flex flex-col h-screen overflow-hidden relative bg-slate-50">
-      {/* Sticky Patient Context Header */}
-      <PatientBanner patient={patient} />
+      {/* Sticky Patient Header */}
+      <PatientHeader patient={patient} onEndSession={() => router.push("/doctor/queue")} />
 
-      {/* Main 2-Pane Viewport */}
+      {/* Clinical Summary Card */}
+      <ClinicalSummaryCard patient={patient} latestEncounter={encounters[0]} />
+
+      {/* Dual-Pane Workspace */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Left Pane: Encounters Timeline (420px) */}
-        <div className="w-[420px] bg-white border-r border-border flex flex-col shrink-0">
+        {/* Left Pane: Timeline (35%) */}
+        <div className="w-[380px] bg-white border-r border-border flex flex-col shrink-0">
           <div className="px-4 py-3 border-b border-border bg-slate-50/50">
             <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Longitudinal Encounter History ({encounters.length})
+              Encounter History ({encounters.length})
             </h2>
+            <p className="text-[10px] text-muted-foreground mt-0.5">↑↓ arrow keys to navigate</p>
           </div>
           <div className="flex-1 overflow-hidden">
             <TimelineFeed
@@ -88,65 +85,60 @@ export default function PatientDossierPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Right Pane: Contextual Workspace */}
+        {/* Right Pane: Clinical Inspector (65%) */}
         <div className="flex-1 flex flex-col min-w-0 bg-white overflow-hidden">
-          {/* Workspace Tabs Header */}
-          <div className="px-6 py-2.5 border-b border-border bg-slate-50/50 flex items-center justify-between gap-4 shrink-0">
-            <div className="flex items-center gap-1">
-              {[
-                { id: "soap", label: "SOAP Breakdown", icon: FileText },
-                { id: "document", label: "OCR & Document Canvas", icon: FileSearch },
-                { id: "vitals", label: "Vitals & Telemetry", icon: Activity },
-                {
-                  id: "safety",
-                  label: "Drug Safety Matrix",
-                  icon: ShieldAlert,
-                  badge: interactions.length > 0 ? interactions.length : undefined,
-                },
-              ].map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
-                      isActive
-                        ? "bg-primary text-white shadow-sm"
-                        : "text-muted-foreground hover:bg-slate-200/60 hover:text-foreground"
-                    }`}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    <span>{tab.label}</span>
-                    {tab.badge && (
-                      <span className="bg-red-500 text-white text-[10px] font-mono px-1.5 py-0.2 rounded-full">
-                        {tab.badge}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+          {/* Tab bar */}
+          <div className="px-5 py-2.5 border-b border-border bg-slate-50/50 flex items-center gap-1 shrink-0">
+            {[
+              { id: "soap", label: "SOAP Note", icon: FileText },
+              { id: "document", label: "Prescription Scan", icon: FileSearch },
+              { id: "vitals", label: "Wearables & Vitals", icon: Activity },
+              {
+                id: "safety",
+                label: "Drug Safety",
+                icon: ShieldAlert,
+                badge: interactions.length > 0 ? interactions.length : undefined,
+              },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  id={`tab-${tab.id}`}
+                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    isActive
+                      ? "bg-primary text-white shadow-sm"
+                      : "text-muted-foreground hover:bg-slate-200/60 hover:text-foreground"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{tab.label}</span>
+                  {tab.badge && (
+                    <span className="bg-red-500 text-white text-[10px] font-mono px-1.5 rounded-full">
+                      {tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Tab Content Canvas */}
-          <div className="flex-1 p-6 overflow-y-auto">
+          {/* Tab content */}
+          <div className="flex-1 p-5 overflow-y-auto">
             {activeTab === "soap" && selectedEncounter && (
               <SoapViewer encounter={selectedEncounter} patient={patient} />
             )}
             {activeTab === "document" && selectedEncounter && (
               <DocumentVisualizer encounter={selectedEncounter} />
             )}
-            {activeTab === "vitals" && (
-              <VitalsAnalytics data={vitalsData ?? []} />
-            )}
-            {activeTab === "safety" && (
-              <SafetyMatrix interactions={interactions} />
-            )}
+            {activeTab === "vitals" && <VitalsAnalytics data={vitalsData ?? []} />}
+            {activeTab === "safety" && <SafetyMatrix interactions={interactions} />}
           </div>
         </div>
 
-        {/* Consent Expiry Lockout Overlay */}
+        {/* Lockout overlay */}
         {isLockedOut && (
           <div className="absolute inset-0 z-40 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4">
             <div className="bg-white border border-border rounded-2xl p-8 max-w-md w-full shadow-2xl text-center space-y-4">
@@ -161,12 +153,11 @@ export default function PatientDossierPage({ params }: PageProps) {
                 </p>
               </div>
               <div className="flex gap-3 pt-2">
-                <Button variant="outline" className="flex-1 text-xs" onClick={() => router.push("/")}>
-                  Return to Roster
+                <Button variant="outline" className="flex-1 text-xs" onClick={() => router.push("/doctor/queue")}>
+                  Return to Queue
                 </Button>
                 <Button className="flex-1 text-xs gap-1.5" onClick={() => setRequestModalOpen(true)}>
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Request Extension
+                  <RefreshCw className="h-3.5 w-3.5" /> Request Extension
                 </Button>
               </div>
             </div>
@@ -174,11 +165,7 @@ export default function PatientDossierPage({ params }: PageProps) {
         )}
       </div>
 
-      <RequestAccessModal
-        open={requestModalOpen}
-        onOpenChange={setRequestModalOpen}
-        preselectedPatient={patient}
-      />
+      <RequestAccessModal open={requestModalOpen} onOpenChange={setRequestModalOpen} preselectedPatient={patient} />
     </div>
   );
 }

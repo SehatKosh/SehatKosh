@@ -15,8 +15,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SehatKosh Clinical Portal | Doctor Dashboard",
-  description: "FHIR-compliant longitudinal health record viewer for clinicians — SehatKosh Medical Platform",
+  title: "SehatKosh Hospital Portal | Multi-Role Clinical System",
+  description: "HIPAA-compliant multi-role clinical web portal for doctors, registrars, administrators, and researchers — Shifa International Hospital",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

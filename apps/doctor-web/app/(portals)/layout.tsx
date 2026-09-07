@@ -5,7 +5,13 @@ import { Sidebar } from "@/components/Sidebar";
 import { CommandPalette } from "@/components/CommandPalette";
 import { QueryProvider } from "./providers";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+// Portal shell — shared by all 4 role portals.
+// Does NOT include <html> or <body>; those live in app/layout.tsx.
+export default function PortalsLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [cmdOpen, setCmdOpen] = useState(false);
 
   return (

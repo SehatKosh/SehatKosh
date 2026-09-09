@@ -63,12 +63,13 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
+  const [showSuggestions, setShowSuggestions] = useState(true);
   const listRef = useRef<FlatList>(null);
 
   const topPadding = Math.max(insets.top, 16) + 8;
 
-  const send = useCallback(() => {
-    const text = input.trim();
+  const send = useCallback((textOverride?: string) => {
+    const text = typeof textOverride === 'string' ? textOverride : input.trim();
     if (!text) return;
     setMessages((prev) => [
       { id: mkId(), role: "assistant", text: "I'll review that against your available health timeline." },
@@ -76,6 +77,7 @@ export default function ChatScreen() {
       ...prev,
     ]);
     setInput("");
+    setShowSuggestions(false);
   }, [input]);
 
   return (
@@ -101,7 +103,10 @@ export default function ChatScreen() {
                   { text: "Cancel" },
                   {
                     text: "Clear",
-                    onPress: () => setMessages([]),
+                    onPress: () => {
+                      setMessages(INITIAL_MESSAGES);
+                      setShowSuggestions(true);
+                    },
                   },
                 ]
               )
@@ -116,8 +121,8 @@ export default function ChatScreen() {
       {/* ── Keyboard-aware body ─────────────────────────────── */}
       <KeyboardAvoidingView
         className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? topPadding + 56 : 0}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? topPadding + 60 : 0}
       >
         {/* Message feed (inverted FlatList so newest is at bottom) */}
         <FlatList
@@ -127,16 +132,16 @@ export default function ChatScreen() {
           keyExtractor={(item) => item.id}
           className="flex-1 px-5"
           contentContainerStyle={{ paddingVertical: 20 }}
-          ListFooterComponent={
-            messages.length <= 1 ? (
-              <View className="mt-3 gap-2">
+          ListHeaderComponent={
+            showSuggestions && !messages.some(m => m.role === 'patient') ? (
+              <View className="mb-3 mt-1 gap-2">
                 {PROMPTS.map((prompt) => (
                   <TouchableOpacity
                     key={prompt}
-                    onPress={() => setInput(prompt)}
-                    className="rounded-xl border border-sky-100 bg-white px-4 py-3"
+                    onPress={() => send(prompt)}
+                    className="rounded-xl border border-[#BAE6FD] bg-[#F0F9FF] px-4 py-3"
                   >
-                    <Text className="text-sm font-medium text-sky-700">
+                    <Text className="text-sm font-medium text-[#0369A1]">
                       {prompt}
                     </Text>
                   </TouchableOpacity>
@@ -157,8 +162,7 @@ export default function ChatScreen() {
 
         {/* ── Sticky input bar ──────────────────────────────── */}
         <View
-          className="border-t border-slate-200 bg-white px-4 pt-3"
-          style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+          className="border-t border-slate-200 bg-white px-4 pt-3 pb-2"
         >
           <View className="flex-row items-end gap-2">
             <TouchableOpacity
@@ -167,18 +171,21 @@ export default function ChatScreen() {
             >
               <Paperclip size={20} color="#64748B" />
             </TouchableOpacity>
-            <TextInput
-              value={input}
-              onChangeText={setInput}
-              multiline
-              maxLength={500}
-              placeholder="Ask about your prescriptions, vitals..."
-              placeholderTextColor="#94A3B8"
-              className="max-h-28 min-h-11 flex-1 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-900"
-            />
+            <View className="flex-1 max-h-[120px] rounded-xl bg-slate-50 px-4 py-2.5">
+              <TextInput
+                value={input}
+                onChangeText={setInput}
+                multiline
+                maxLength={500}
+                placeholder="Ask about your prescriptions, vitals..."
+                placeholderTextColor="#94A3B8"
+                className="text-sm text-slate-900"
+                style={{ minHeight: 20 }}
+              />
+            </View>
             <TouchableOpacity
               accessibilityLabel="Send message"
-              onPress={send}
+              onPress={() => send()}
               className={`h-11 w-11 items-center justify-center rounded-full ${
                 input.trim() ? "bg-sky-600" : "bg-slate-200"
               }`}

@@ -61,7 +61,13 @@ export default function OcrVerifyScreen() {
             onPress={() =>
               Alert.alert(
                 "Saved",
-                "The verified medication list was added to your records."
+                "The verified medication list was added to your records.",
+                [
+                  {
+                    text: "OK",
+                    onPress: () => router.replace("/(tabs)/records"),
+                  },
+                ]
               )
             }
             className={`w-full flex-row items-center justify-center rounded-xl py-4 ${

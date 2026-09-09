@@ -1,274 +1,180 @@
-# SEHATKOSH_DOCTOR_WEB_SPECIFICATION.md
-# Clinical Web Portal Architecture & UI/UX Specification
+# Mobile UI/UX Rectification & Hospital Web Revamp Blueprint
 
 ---
 
-## 1. Global Clinical Web Design System & Foundations
+## Part 1: Mobile UI/UX Rectifications (`apps/mobile` Exclusively)
 
-### 1.1 Visual Tokens & Theme Variables
-Define these tokens inside `apps/doctor-web/app/globals.css` and map via `@sehatkosh/tailwind-config`.
+### 1. Assistant Chat Keyboard & Layout Calibration
 
-| Token Name | Value (HSL / Hex) | Clinical Semantic Usage |
-| :--- | :--- | :--- |
-| `--background` | `0 0% 100%` (`#FFFFFF`) | Base workspace canvas |
-| `--background-subtle` | `210 40% 98%` (`#F8FAFC`) | Sidebar fill, chart panel backing, inactive card beds |
-| `--surface-card` | `0 0% 100%` (`#FFFFFF`) | Clinical panels, metric modules (1px border: `hsl(214.3 31.8% 91.4%)`) |
-| `--text-primary` | `222.2 84% 4.9%` (`#020817`) | Patient names, primary vitals, diagnosis headings |
-| `--text-secondary` | `215.4 16.3% 46.9%` (`#64748B`) | Timestamps, dosage schedules, ICD-10/SNOMED codes |
-| `--primary` | `221.2 83.2% 53.3%` (`#2563EB`) | Interactive actions, active tab borders, focus rings |
-| `--primary-hover` | `224.3 76.3% 48%` (`#1D4ED8`) | Pressed state for primary clinical actions |
-| `--success` | `142.1 76.2% 36.3%` (`#16A34A`) | In-range vitals, verified prescriptions, active consent |
-| `--success-subtle` | `138.5 76.5% 96.7%` (`#F0FDF4`)| Normal range metric background, active status fills |
-| `--warning` | `38 92% 50%` (`#F59E0B`) | Borderline vitals, expiring consent (< 2 hours) |
-| `--warning-subtle` | `48 96% 89%` (`#FEF3C7`) | Amber alert banner, pending verification badges |
-| `--destructive` | `0 84.2% 60.2%` (`#EF4444`) | Severe allergies, drug contraindications, access revoked |
-| `--destructive-subtle`| `0 85.7% 97.3%` (`#FEF2F2`)| Allergy banners, contraindication callouts |
-| `--border` | `214.3 31.8% 91.4%` (`#E2E8F0`) | Structural dividing lines, card outlines, table borders |
+#### A. Root Cause Analysis
 
-### 1.2 Typography & Dense Clinical Hierarchy
-Desktop viewport density requires high scannability. Font stack: `Inter` for general UI, `JetBrains Mono` for lab metrics, timestamps, and codes.
+* **Resting Floating Gap:** In Expo Router with bottom tabs, the tab bar consumes ~60–75px of physical screen height. Applying redundant bottom padding (`insets.bottom` on the screen wrapper plus additional padding on the input container) pushes the input bar high above the tab bar.
+* **Keyboard Over-Elevation (Double-Offset Bug):** On modern Android and iOS environments, `KeyboardAvoidingView` calculates keyboard height on top of window resizing. If `behavior="padding"` or `behavior="height"` is paired with a non-zero `keyboardVerticalOffset` inside an already resized window, the input bar doubles the lift, creating the large empty void above the keyboard.
 
-*   **Display Header:** 20pt (28px) / Bold — Patient Name in Dossier Header.
-*   **Section Header (H1):** 16pt (22px) / SemiBold — Panel titles (e.g., "Longitudinal Vitals", "Active Regimen").
-*   **Subsection Header (H2):** 13pt (18px) / SemiBold — SOAP group headings, modal headers.
-*   **Metric Display:** 22pt (28px) / Bold / Monospace (`font-mono tracking-tight`) — Numerical vitals (e.g., `98%`, `120/80`).
-*   **Body Standard:** 13pt (18px) / Regular / Leading: 20px — Doctor session notes, transcribed conversation.
-*   **Table / Meta Dense:** 11pt (15px) / Medium / Leading: 16px — SNOMED/LOINC codes, dosage timing, pill tags.
+#### B. Architectural Fixes for the IDE Agent
 
-### 1.3 Desktop Grid & Workspace Layout (1440px Reference Viewport)
-The portal uses a 3-column responsive layout optimized for widescreen clinical review:
-*   **Column 1: Collapsible App Sidebar (240px)** — Navigation, consent requests, patient roster.
-*   **Column 2: Longitudinal Timeline & Clinical History (Fixed 420px or 35%)** — Chronological feed of past visits, scanned prescriptions, and lab tests.
-*   **Column 3: Active Workspace & Detail Inspector (Flexible remaining width ~65%)** — Dynamic view (SOAP review, split-screen high-res document viewer, or multi-metric longitudinal chart).
+* **Zero Out Resting Bottom Margin:** Remove all manual bottom margins or excessive paddings from the outer screen container. The bottom edge of the input bar container must sit flush against the top edge of the tab bar with a standard 8px clearance.
+* **Platform-Specific Keyboard Avoidance Tuning:**
+* **iOS:** Set `KeyboardAvoidingView` behavior to `"padding"`. Calibrate `keyboardVerticalOffset` strictly to the height of the tab bar plus top notch offset.
+* **Android:** Set `KeyboardAvoidingView` behavior to `undefined` (or disable it entirely if the window resize handles it), as modern Expo Go on Android handles window resizing natively. This prevents the input from shooting to the screen center.
+
+
+* **Input Container Pinning:** Wrap the `TextInput` in a container configured with a maximum height cap (up to 5 lines), flex-grow behavior, and a fixed padding structure (horizontal 16px, vertical 10px).
 
 ---
 
-## 2. Navigation Architecture & Global Shell
+### 2. Assistant Suggestions Positioning & Dismissal Logic
 
-### 2.1 Persistent Sidebar (`components/Sidebar.tsx`)
-Anchored to the left of all authenticated routes (`apps/doctor-web/app/(dashboard)/layout.tsx`):
-+-------------------------------------------------------------+
-| [SK Logo] SehatKosh MD | Dr. Tariq Khan (Cardiology)        |
-+-------------------------------------------------------------+
-|  [Search / Command + K]                                     |
-|                                                             |
-|  NAV ITEMS:                                                 |
-|  * Active Patients (Roster)                                |
-|  * Access Requests (Consent Engine)                         |
-|  * Direct Patient Lookup (By Medical ID / QR)               |
-|                                                             |
-|  SESSION STATUS:                                            |
-|  Connected: Shifa International Hospital                     |
-|                                                             |
-|  [Bottom] System Settings | Sign Out                        |
-+-------------------------------------------------------------+
-*   **Global Command Palette (`Command + K` / `Ctrl + K`):** Opens a fast modal input to jump directly to any patient by Medical ID (`SK-XXXX`), CNIC, or Full Name.
+#### A. Layout Re-Ordering
 
-### 2.2 Sticky Patient Context Banner (`components/PatientBanner.tsx`)
-When a clinician selects a patient, a persistent 64px header locks across the top of the main viewport:
+* **Anchor to Top of Chat Scroll:** Extract the suggestions list from the message bubble flow. Place it in a dedicated header container rendered at the top of the message list (or as a `ListHeaderComponent` if using an inverted list).
+* **Visual Structure:** Display 2–3 horizontal/stacked prompt pills (e.g., *"Summarize my last visit"*, *"Check antibiotic contraindications"*, *"Explain my resting heart rate"*). Use light blue backgrounds (`#F0F9FF`), subtle borders (`#BAE6FD`), and dark blue typography (`#0369A1`).
 
-*   **Left Section (Demographics):**
-    *   Patient Name: "Muhammad Ahsan" (Bold 18px).
-    *   Meta: "23 Y • Male • Blood: O+ • ID: SK-8921-X".
-*   **Center Section (Critical Safety Flags):**
-    *   Crimson Alert Badge: `Allergies: Penicillin (Severe), NSAIDs (Mild)` (Always visible).
-    *   Chronic Tag: `Hypertension (Stage 1)`.
-*   **Right Section (Consent & Security Status):**
-    *   Active Access Timer: `Access Active: 23h 14m remaining` (Green clock icon).
-    *   Action: "Revoke Access" / "Close Patient Dossier" button.
+#### B. Dynamic Dismissal Mechanism
+
+* **State Trigger:** Bind the rendering of the suggestions container to a boolean flag: visible only when the conversation thread has zero user-submitted prompts.
+* **Auto-Dismissal:** The exact moment the user taps "Send" or selects one of the suggestion pills, toggle the visibility state to `false`. Ensure an animated fade-out/collapse occurs so the screen does not jump awkwardly.
 
 ---
 
-## 3. Screen-by-Screen Detailed Specifications
+### 3. Camera Document Ingestion & UX Extraction Flow
 
-### 3.1 Patient Roster & Authorization Desk (`app/(dashboard)/page.tsx`)
+#### A. Root Cause of Missing Screen Transition
 
-#### Header Area
-*   Title: "Clinical Roster".
-*   Search Filter: Input with quick-filter pills (`All`, `Active In-Consultation`, `Awaiting Approval`, `Expired Today`).
+* The camera screen currently triggers photo capture or library selection without completing the navigation lifecycle. The promise either hangs during asset caching, or the navigation router call to `intake/ocr-verify` is unhandled or missing parameter payload forwarding.
 
-#### Roster Table Component (`components/PatientTable.tsx`)
-Dense, accessible data table built with `shadcn/ui` table primitives:
+#### B. Realistic Extraction Simulation & Visual Feedback
 
-| Column Name | Type | Display Pattern |
-| :--- | :--- | :--- |
-| **Patient Details** | Text + Avatar | Full Name, Medical ID, Age, Gender |
-| **Last Encounter** | Timestamp | Date + Reason (e.g., "Aug 30, 2026 • Bronchitis Follow-up") |
-| **Active Regimen** | Badges | Pill count (`3 Active Drugs`), highlighted red if contraindicated |
-| **Vitals Status** | Mini Sparkline | Last SpO2 + HR indicators (Color-coded: Green = Normal, Red = Abnormal) |
-| **Access State** | Countdown Badge | `Granted (23h left)` (Green) or `Pending Approval` (Amber) |
-| **Action** | Button Pair | "Open Dossier" (Primary) / "Extend Access" (Secondary Outline) |
+* **Interactive Extraction Overlay:** When the shutter is pressed or an image is chosen from the gallery, freeze the viewport and immediately display an elevated modal dialog (glassmorphic dark backdrop with rounded center card).
+* **Progressive Micro-Copy Sequence (2.2-Second Total Duration):**
+* *0.0s – 0.7s:* Display animated spinning radar icon with text: **"Scanning document geometry & contrast..."**
+* *0.7s – 1.5s:* Update icon to document search state with text: **"Extracting clinical text via Vision Pipeline..."**
+* *1.5s – 2.2s:* Update icon to shield verification with text: **"Structuring FHIR MedicationRequest entities..."**
 
-#### Patient Quick-Lookup Modal (QR & Pin Intake)
-*   For walk-in patients: Doctor can scan the QR code displayed on the patient's mobile app (Tab 5) or manually input the patient's 6-character ephemeral pairing PIN.
-*   Triggers an immediate access request push notification to the patient's mobile device.
+
+* **Deterministic Transition:** At the 2.2-second mark, trigger an explicit push transition to the extracted review page (`/intake/ocr-verify`), passing the captured document URI as a route parameter. Ensure the camera component unmounts gracefully to prevent memory leaks in Expo Go.
 
 ---
 
-### 3.2 Longitudinal Patient Dossier (`app/(dashboard)/patients/[id]/page.tsx`)
+## Part 2: Complete Web Multi-Role Revamp (`apps/doctor-web`)
 
-A two-pane layout presenting the patient's complete history.
+### 1. Anti-Crash Defensive UI Architecture
 
-#### Left Pane: Timeline of Encounters (420px width)
-*   **Filter Bar:** Toggle pills (`All Records`, `Doctor Visits (SOAP)`, `Prescriptions`, `Lab Reports`, `Wearable Summaries`).
-*   **Timeline List (`components/TimelineFeed.tsx`):**
-    *   Chronological grouping (e.g., "August 2026", "July 2026").
-    *   **Encounter Card Anatomy:**
-        *   Top Row: Encounter Type (`Clinical Scribe Note` vs `Scanned Prescription`) + Date.
-        *   Physician Name & Clinic: "Dr. Ayesha Malik • PIMS Hospital".
-        *   Summary Snippet: 2-line condensed diagnosis (e.g., "Acute bacterial pharyngitis. Prescribed Amoxicillin course; patient reported mild fever.").
-        *   Drug Tag Row: Micro-pills showing prescribed molecules (`Amoxicillin 500mg`, `Paracetamol 500mg`).
-        *   Selected State: Active card highlighted with a 2px blue border (`border-primary bg-sky-50/30`).
+To guarantee zero runtime crashes and 100% operational resilience across all web views:
 
-#### Right Pane: Contextual Workspace & Multi-Tab Inspector
-Tabbed interface reacting to the selected timeline item:
-1.  **Tab 1: Clinical SOAP Breakdown (Default)**
-2.  **Tab 2: Original Document & OCR Inspector**
-3.  **Tab 3: Longitudinal Vitals & Telemetry**
-4.  **Tab 4: Drug-Drug & Allergy Interaction Matrix**
+* **Safe Optional Chaining & Default Fallbacks:** Every rendered prop (patient demographics, prescription arrays, timestamp strings, array lengths) must use optional chaining and explicit fallbacks (e.g., fallback strings, empty arrays, or localized dash markers).
+* **Guarded Event Handlers:** Every button, action pill, and menu item must have a bound, non-empty `onClick` handler. If an action has no backend yet, bind it to an alert, modal, or toast notification. No button should be left unhandled.
+* **Deterministic Mock Hydration:** All datasets must load through a unified mock data service with default exports to prevent `undefined` reading errors during client-side hydration.
 
 ---
 
-### 3.3 Tab 1: Clinical SOAP Breakdown (`components/SoapViewer.tsx`)
-Displays the structured LLM transformation of the patient's consultation notes:
+### 2. Dashboard 1: Admin / Super Admin (Platform Engineering & Governance)
 
-*   **Soap Container:** 4 distinct structured clinical panels with copy/export capabilities:
-    1.  **Subjective (S):**
-        *   Chief Complaints, symptom onset, reported severity, patient direct statements.
-    2.  **Objective (O):**
-        *   Clinical observations, blood pressure logged at consultation, synced smartwatch heart rate and SpO2 for the day of visit.
-    3.  **Assessment (A):**
-        *   Primary Diagnosis, Differential Diagnoses, attached ICD-10 and SNOMED-CT code pills.
-    4.  **Plan (P):**
-        *   *Medications Table:* Molecule name, Form, Strength, Frequency, Duration, Refill Count.
-        *   *Diagnostic Orders:* Prescribed blood panels, X-rays, or ultrasounds.
-        *   *Doctor Instructions:* Patient guidance notes, dietary restrictions, follow-up window.
-*   **Doctor Correction Actions:**
-    *   "Amend Clinical Note" button: Unlocks inline editing so the consulting physician can append or correct diagnostic codes before saving.
-    *   "Export as HL7 FHIR Bundle": Generates a validated FHIR R4 `Bundle` (containing `Composition`, `Condition`, and `MedicationRequest` resources) for download or EHR sync.
+The Super Admin portal is designed for platform-level operational oversight, institutional approvals, data governance, and extreme security safeguards.
 
----
+#### Key Modules & UI Specifications
 
-### 3.4 Tab 2: High-Resolution Document Visualizer (`components/DocumentVisualizer.tsx`)
-A split view for inspecting scanned physical documents and comparing them against extracted data:
+* **Platform Overview Matrix:** Real-time metrics tracking connected hospitals, registered physician accounts, active time-scoped patient consents, and total sanitized research exports.
+* **Hospital Licensing & Onboarding Approval:**
+* Verification desk for onboarding new hospital entities.
+* Action table showing pending hospital requests, facility accreditation IDs, administrative contact emails, and approval/rejection button pairs.
 
-*   **Left Viewport (50%): Deep Zoom & Pan Canvas**
-    *   Renders the scanned prescription or X-ray using high-resolution canvas with pinch-to-zoom, pan, rotation (90° steps), and contrast enhancement filters.
-    *   Overlay Bounding Boxes: Highlights detected text regions with subtle green outlines indicating high confidence OCR and amber outlines for low-confidence words.
-*   **Right Viewport (50%): Validated Key-Value Field Review**
-    *   Editable form displaying the extracted structured values:
-        *   Clinician Header & Registration Number.
-        *   Extracted Rx lines with SNOMED mapping status indicators.
-    *   "Verify & Sign Off" Button: Marks the document as clinically reviewed and verified by a licensed doctor.
+
+* **Multi-Admin Quorum Security (2-of-3 Approval Protocol):**
+* Destructive actions (such as purging hospital records, revoking facility licenses, or force-resetting regional databases) cannot be completed by a single admin.
+* Triggering a critical action creates a "Pending Quorum Action" item requiring cryptographic or session sign-off from a second verified super admin before execution.
+* Status badges visually reflect quorum state: `[1 of 2 Sign-offs Obtained - Awaiting Co-Admin Confirmation]`.
+
+
+* **Automated Data Anonymization Engine:**
+* Pipeline tool that pulls patient cohorts, strips direct PII (CNIC, full name, phone, residential address), applies 5-year age binning, and issues sanitized FHIR R4 clinical JSON datasets for hospital research partnerships.
+
+
+* **System-Wide Audit Ledger (Privacy-Compliant):**
+* Immutable chronological event table recording staff logins, role updates, consent requests, and break-glass overrides.
+* Strict privacy filter: All personal clinical records are masked from admin audit logs to preserve doctor-patient confidentiality.
+
+
 
 ---
 
-### 3.5 Tab 3: Longitudinal Vitals & Telemetry (`components/VitalsAnalytics.tsx`)
-Visualizes data synced from the patient's wearables alongside clinic visits:
+### 3. Dashboard 2: Consulting Doctor (30-Second Clinical Review)
 
-*   **Time Range Selector:** `7 Days`, `30 Days`, `90 Days`, `1 Year`.
-*   **Graph 1: Resting Heart Rate vs. Daily Activity (Dual-Axis Chart)**
-    *   Line chart (Resting HR) combined with bar chart (Daily Steps).
-    *   Marker flags along the x-axis indicating when new prescriptions were started (to observe cardiovascular response to medications like beta-blockers or stimulants).
-*   **Graph 2: Blood Oxygen (SpO2) Distribution**
-    *   Scatter plot with a shaded reference band indicating the normal clinical threshold (95% - 100%).
-    *   Red dot annotations for any hypoxic dips below 92%.
-*   **Vitals Summary Table:**
-    *   Aggregated minimum, maximum, median, and 95th percentile metrics for quick clinical review.
+The Doctor portal prioritizes instant comprehension, eliminating data-entry burdens while enforcing strict time-bound data isolation.
 
----
+#### Key Modules & UI Specifications
 
-### 3.6 Tab 4: Drug-Drug & Allergy Contraindication Matrix (`components/SafetyMatrix.tsx`)
-A safety module cross-referencing past medications, active prescriptions, and known patient allergies:
+* **Time-Scoped Patient Access Control (The 24-Hour Rule):**
+* The doctor has full access to the patient's longitudinal timeline, scanned prescriptions, and smartwatch vitals for exactly **24 hours** following a scheduled consultation.
+* *Active State (< 24h):* Displays countdown badge: `[Clinical Access Active: 18h 42m Remaining]`.
+* *Expired State (> 24h):* Automatic downgrade. The full timeline blurs/locks, showing only basic baseline demographics (Name, Age, Blood Group, Emergency Flags).
+* *Re-Access Flow:* A prominent button allows the doctor to dispatch an `Extend Clinical Access Request` to the patient's mobile app.
 
-*   **Safety Status Alert Banner:**
-    *   If no conflicts: Green banner `No pharmacological contraindications detected with active regimen`.
-    *   If conflict detected: High-emphasis Crimson Banner `CRITICAL CONTRAINDICATION DETECTED`.
-*   **Conflict Detail Card:**
-    *   *Conflict Type:* `Drug-Allergy Cross-Reactivity`.
-    *   *Molecules Involved:* `Amoxicillin` (Extracted Prescription) vs `Penicillin G` (Known Severe Allergy).
-    *   *Clinical Severity:* Level 1 (Severe / Anaphylaxis Risk).
-    *   *Mechanism of Action:* Beta-lactam core cross-sensitivity.
-    *   *Suggested Clinical Alternative:* "Consider Macrolides (Azithromycin) or Fluoroquinolones subject to culture sensitivity."
+
+* **10-Second Clinical TL;DR Card:** An emerald-backed summary card at the top of the patient view detailing primary ongoing conditions, active drug regimens, and vital anomalies.
+* **Longitudinal Dual-Pane Dossier:** Chronological encounter feed on the left pane paired with a dense, structured SOAP note viewer and scanned document inspector on the right pane.
+* **Anonymous Case Study Escalation:** A 1-click action allowing the doctor to request an anonymized copy of a complex case from the Hospital Admin for medical teaching or research evaluation.
 
 ---
 
-### 3.7 Consent Engine & Time-Bound Access Management (`app/(dashboard)/consent/page.tsx`)
+### 4. Dashboard 3: Help Desk / Registrar (Intake & Routing)
 
-*   **Access Request Modal (`components/RequestAccessModal.tsx`):**
-    *   Triggered when searching for a patient not yet in the doctor's active roster.
-    *   Form Fields:
-        *   Patient Medical ID / Phone Number.
-        *   Requested Access Scope: Radio selection (`Full Longitudinal History`, `Prescriptions & Allergies Only`, `Emergency Vitals Only`).
-        *   Requested Duration: Radio selection (`4 Hours (Single Visit)`, `24 Hours`, `7 Days`).
-        *   Clinical Purpose: Text input (e.g., "Consultation for chronic hypertension").
-    *   Submission: Sends an instant cryptographic authorization push to the patient's mobile app. Displays a polling indicator: "Awaiting patient approval on mobile device...".
-*   **Session Expiry Lockout Overlay:**
-    *   If the consent duration expires while the physician has the patient dossier open:
-    *   Instantly blur the clinical data behind a frosted glass overlay (`backdrop-blur-md`).
-    *   Display a centered modal: "Consent Window Expired. Patient authorization has concluded. Request extension to re-enable view."
+The Front-Desk Help Desk acts as the hospital's entry point, registering walk-in patients and routing them to doctors without exposing sensitive medical history.
 
----
+#### Key Modules & UI Specifications
 
-## 4. Defensive UX, Security & Clinical Guardrails
+* **Restricted Patient Lookup Desk:**
+* Fast-search input field supporting search by **National ID (CNIC)**, **Mobile Number**, or **SehatKosh Medical ID**.
+* *Privacy Sandbox:* Help Desk personnel can *only* see identity verification fields (Photo, Full Name, CNIC, Age, Gender, Primary Phone). Full clinical notes, past diseases, prescriptions, and lab tests are completely hidden.
 
-### 4.1 Accidental Action Prevention & Auditing
-*   **Prescription Override Safeguard:** If a doctor marks a contraindicated medication as "Clinically Overridden", display a mandatory justification modal requiring the doctor to type a clinical rationale before saving.
-*   **Full Audit Logging:** Every document view, image zoom, SOAP edit, and FHIR export automatically dispatches an audit event (`doctorId`, `patientId`, `actionType`, `timestamp`) to ensure HIPAA / GDPR compliance.
 
-### 4.2 Network Resilience & Fast State Hydration
-*   **TanStack Query Cache Layer:** Patient dossiers cache for 5 minutes of inactive browsing. When switching between timeline items, data renders instantly from cache while revalidating in the background.
-*   **Copy to Clipboard Tooling:** Every medication name, dosage string, and ICD-10 code features a 1-click copy button with visual checkmark feedback for quick pasting into local hospital EHR systems.
+* **New Patient Quick-Enrollment Modal:** Clean, structured form for creating a new patient record with basic demographics, emergency contact info, and known critical allergies.
+* **Consultation & Room Assignment Engine:**
+* Dropdown to select on-duty Attending Doctor, department, and allocated room number.
+* Time slot picker for immediate triage or scheduled appointment.
+
+
+* **Mobile Consent Dispatch Trigger:**
+* Button: `Dispatch Mobile Access Request`. Sends an instant authorization push notification to the patient's phone so the doctor can access their medical history.
+* Live state pill displaying real-time status: `[Awaiting Patient Mobile Approval]` $\rightarrow$ `[Authorized - Pushed to Doctor's Queue]`.
+
+
 
 ---
 
-## 5. Directory Structure & File Manifest for `apps/doctor-web`
+### 5. Dashboard 4: Hospital Admin (Facility Administration & Records)
 
-```text
-apps/doctor-web/
-├── app/
-│   ├── (auth)/
-│   │   ├── login/
-│   │   │   └── page.tsx                # Clinician authentication & 2FA entry
-│   │   └── layout.tsx
-│   ├── (dashboard)/
-│   │   ├── layout.tsx                  # Global clinical shell (Sidebar + Header)
-│   │   ├── page.tsx                    # Clinical roster & active patient desk
-│   │   ├── consent/
-│   │   │   └── page.tsx                # Consent requests & authorization hub
-│   │   └── patients/
-│   │       └── [id]/
-│   │           ├── page.tsx            # Longitudinal Patient Dossier (Timeline + Inspector)
-│   │           └── loading.tsx         # Skeleton loader for patient charts
-│   ├── globals.css                     # Tailwind tokens matching @sehatkosh/tailwind-config
-│   └── layout.tsx                      # Root HTML shell & Inter font provider
-├── components/
-│   ├── ui/                             # shadcn/ui primitives
-│   │   ├── button.tsx
-│   │   ├── badge.tsx
-│   │   ├── card.tsx
-│   │   ├── dialog.tsx
-│   │   ├── dropdown-menu.tsx
-│   │   ├── input.tsx
-│   │   ├── table.tsx
-│   │   └── tabs.tsx
-│   ├── CommandPalette.tsx              # Command + K instant patient lookup
-│   ├── ConsentCountdown.tsx            # Real-time access timer badge
-│   ├── DocumentVisualizer.tsx          # Pinch-pan-zoom high-res prescription canvas
-│   ├── PatientBanner.tsx               # Sticky top patient demographics & allergy header
-│   ├── PatientTable.tsx                # Searchable roster table
-│   ├── RequestAccessModal.tsx          # Push consent request trigger
-│   ├── SafetyMatrix.tsx                # Drug-drug and allergy interaction warning panel
-│   ├── Sidebar.tsx                     # Collapsible persistent navigation
-│   ├── SoapViewer.tsx                  # Structured SOAP note display & editor
-│   ├── TimelineFeed.tsx                # Chronological card list of encounters
-│   └── VitalsAnalytics.tsx             # Dual-axis charts for HR, steps, and SpO2
-├── hooks/
-│   ├── usePatient.ts                   # TanStack Query hook fetching patient dossier
-│   ├── usePatientVitals.ts             # Hook for longitudinal telemetry data
-│   └── useConsentSession.ts            # Hook monitoring active session expiration
-├── lib/
-│   ├── fhirExporter.ts                 # Utility converting dossier state to FHIR R4 Bundle
-│   └── utils.ts                        # clsx and twMerge helper
-└── next.config.mjs                     # Transpile packages configuration
+The Hospital Admin manages physical department structures, medical staff credentials, and institutional research requests.
 
+#### Key Modules & UI Specifications
+
+* **Facility Operations Overview:** High-level metrics tracking departmental capacity, active consulting rooms, staff on duty, and daily intake volume.
+* **Staff Directory & Credentials Management:**
+* Management table for hospital doctors and help-desk registrars.
+* Controls to add new staff, update room assignments, toggle on-duty/off-duty statuses, or revoke system credentials.
+
+
+* **Hospital Records & Paper Ingestion Portal:**
+* Dedicated interface for staff to scan and upload physical paper records, prescriptions, and lab reports brought in by patients, committing them to their cloud ledger.
+
+
+* **Research & Case Study Clearinghouse:**
+* Review inbox for anonymous case study requests submitted by hospital doctors.
+* Approval workflow to relay vetted anonymization requests to the platform Super Admin.
+
+
+
+---
+
+## 6. Global Navigation & Role-Switching Shell
+
+To facilitate evaluation and cross-departmental demonstration without requiring complex authentication redirects:
+
+* **Persistent Top Role Switcher:** Integrate a sleek utility banner at the top of `apps/doctor-web` allowing the user to seamlessly toggle between all 4 dashboards:
+* `[Super Admin]` $\rightarrow$ routes to `/admin/overview`
+* `[Hospital Admin]` $\rightarrow$ routes to `/hospital-admin/roster`
+* `[Doctor]` $\rightarrow$ routes to `/doctor/queue`
+* `[Help Desk]` $\rightarrow$ routes to `/registrar`
+
+
+* **Unified Design Consistency:** Preserve identical Tailwind color tokens, font hierarchies, button radii, and component primitives across all 4 dashboards to maintain a cohesive, clinical feel.

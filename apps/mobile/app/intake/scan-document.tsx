@@ -2,7 +2,7 @@ import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
 import { Image as ImageIcon, X, Zap, ZapOff } from "lucide-react-native";
 import { useRef, useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -10,6 +10,8 @@ export default function ScanDocumentScreen() {
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [flash, setFlash] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
   const insets = useSafeAreaInsets();
 
   const capture = async () => {
@@ -17,12 +19,26 @@ export default function ScanDocumentScreen() {
       await requestPermission();
       return;
     }
-    const result = await cameraRef.current?.takePictureAsync({ quality: 0.8 });
-    if (result?.uri)
-      router.push({ pathname: "/intake/ocr-verify", params: { imageUri: result.uri } });
+    if (!isCameraReady || isCapturing) {
+      return;
+    }
+
+    try {
+      setIsCapturing(true);
+      const result = await cameraRef.current?.takePictureAsync({ quality: 0.8 });
+      if (result?.uri) {
+        router.push({ pathname: "/intake/ocr-verify", params: { imageUri: result.uri } });
+      }
+    } catch (error: any) {
+      console.warn("Camera photo capture error:", error);
+      Alert.alert("Camera Not Ready", "The camera is still initializing. Please try again in a moment.");
+    } finally {
+      setIsCapturing(false);
+    }
   };
 
   const pick = async () => {
+    if (isCapturing) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.8,
@@ -60,6 +76,7 @@ export default function ScanDocumentScreen() {
         ref={cameraRef}
         facing="back"
         enableTorch={flash}
+        onCameraReady={() => setIsCameraReady(true)}
         style={StyleSheet.absoluteFill}
       />
 
@@ -103,6 +120,7 @@ export default function ScanDocumentScreen() {
         {/* Gallery picker */}
         <TouchableOpacity
           onPress={pick}
+          disabled={isCapturing}
           className="h-12 w-12 items-center justify-center rounded-full bg-white/20"
         >
           <ImageIcon size={22} color="#FFFFFF" />
@@ -111,9 +129,15 @@ export default function ScanDocumentScreen() {
         {/* Shutter button */}
         <TouchableOpacity
           onPress={capture}
+          disabled={!isCameraReady || isCapturing}
+          style={{ opacity: !isCameraReady || isCapturing ? 0.6 : 1 }}
           className="h-[72px] w-[72px] items-center justify-center rounded-full border-4 border-white bg-transparent"
         >
-          <View className="h-14 w-14 rounded-full bg-white" />
+          {isCapturing ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <View className="h-14 w-14 rounded-full bg-white" />
+          )}
         </TouchableOpacity>
 
         {/* Spacer balances gallery icon */}

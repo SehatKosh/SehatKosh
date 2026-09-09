@@ -122,7 +122,7 @@ export default function ChatScreen() {
       <KeyboardAvoidingView
         className="flex-1"
         behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? topPadding + 60 : 0}
+        keyboardVerticalOffset={0}
       >
         {/* Message feed (inverted FlatList so newest is at bottom) */}
         <FlatList

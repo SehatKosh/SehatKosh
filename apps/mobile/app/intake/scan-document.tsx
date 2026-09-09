@@ -22,8 +22,7 @@ export default function ScanDocumentScreen() {
     setTimeout(() => {
       setProcessState(null);
       // Unmount camera gracefully by using replace instead of push, or just route push.
-      router.push({ pathname: "/intake/ocr-verify", params: { imageUri: uri } });
-      setIsCapturing(false);
+      router.replace({ pathname: "/intake/ocr-verify", params: { imageUri: uri } });
     }, 2200);
   };
 

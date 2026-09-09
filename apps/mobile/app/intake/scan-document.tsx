@@ -1,8 +1,8 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
-import { Image as ImageIcon, X, Zap, ZapOff } from "lucide-react-native";
+import { Image as ImageIcon, X, Zap, ZapOff, Scan, FileSearch, ShieldCheck } from "lucide-react-native";
 import { useRef, useState } from "react";
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -10,28 +10,56 @@ export default function ScanDocumentScreen() {
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [flash, setFlash] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [processState, setProcessState] = useState<number | null>(null);
   const insets = useSafeAreaInsets();
+
+  const simulateExtraction = (uri: string) => {
+    setProcessState(0);
+    setTimeout(() => setProcessState(1), 700);
+    setTimeout(() => setProcessState(2), 1500);
+    setTimeout(() => {
+      setProcessState(null);
+      // Unmount camera gracefully by using replace instead of push, or just route push.
+      router.replace({ pathname: "/intake/ocr-verify", params: { imageUri: uri } });
+    }, 2200);
+  };
 
   const capture = async () => {
     if (!permission?.granted) {
       await requestPermission();
       return;
     }
-    const result = await cameraRef.current?.takePictureAsync({ quality: 0.8 });
-    if (result?.uri)
-      router.push({ pathname: "/intake/ocr-verify", params: { imageUri: result.uri } });
+    if (!isCameraReady || isCapturing) {
+      return;
+    }
+
+    try {
+      setIsCapturing(true);
+      const result = await cameraRef.current?.takePictureAsync({ quality: 0.8 });
+      if (result?.uri) {
+        simulateExtraction(result.uri);
+      } else {
+        setIsCapturing(false);
+      }
+    } catch (error: any) {
+      console.warn("Camera photo capture error:", error);
+      Alert.alert("Camera Not Ready", "The camera is still initializing. Please try again in a moment.");
+      setIsCapturing(false);
+    }
   };
 
   const pick = async () => {
+    if (isCapturing) return;
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.8,
     });
-    if (!result.canceled && result.assets[0])
-      router.push({
-        pathname: "/intake/ocr-verify",
-        params: { imageUri: result.assets[0].uri },
-      });
+    if (!result.canceled && result.assets[0]) {
+      setIsCapturing(true);
+      simulateExtraction(result.assets[0].uri);
+    }
   };
 
   if (!permission?.granted) {
@@ -60,8 +88,30 @@ export default function ScanDocumentScreen() {
         ref={cameraRef}
         facing="back"
         enableTorch={flash}
+        onCameraReady={() => setIsCameraReady(true)}
         style={StyleSheet.absoluteFill}
       />
+
+      {/* Extraction Overlay */}
+      {processState !== null && (
+        <View style={StyleSheet.absoluteFill} className="z-50 items-center justify-center bg-black/70 px-8">
+          <View className="w-full max-w-sm rounded-3xl bg-slate-900 p-8 items-center shadow-2xl border border-slate-800">
+            {processState === 0 && <Scan size={48} color="#38BDF8" />}
+            {processState === 1 && <FileSearch size={48} color="#38BDF8" />}
+            {processState === 2 && <ShieldCheck size={48} color="#34D399" />}
+            
+            {processState === 0 && (
+              <ActivityIndicator className="absolute top-8" size="large" color="#38BDF8" style={{ transform: [{ scale: 1.5 }], opacity: 0.3 }} />
+            )}
+            
+            <Text className="mt-8 text-center text-base font-medium text-white">
+              {processState === 0 && "Scanning document geometry & contrast..."}
+              {processState === 1 && "Extracting clinical text via Vision Pipeline..."}
+              {processState === 2 && "Structuring FHIR MedicationRequest entities..."}
+            </Text>
+          </View>
+        </View>
+      )}
 
       {/* 2. Top Controls — dismiss & flash, anchored below status bar */}
       <View
@@ -103,6 +153,7 @@ export default function ScanDocumentScreen() {
         {/* Gallery picker */}
         <TouchableOpacity
           onPress={pick}
+          disabled={isCapturing}
           className="h-12 w-12 items-center justify-center rounded-full bg-white/20"
         >
           <ImageIcon size={22} color="#FFFFFF" />
@@ -111,9 +162,15 @@ export default function ScanDocumentScreen() {
         {/* Shutter button */}
         <TouchableOpacity
           onPress={capture}
+          disabled={!isCameraReady || isCapturing}
+          style={{ opacity: !isCameraReady || isCapturing ? 0.6 : 1 }}
           className="h-[72px] w-[72px] items-center justify-center rounded-full border-4 border-white bg-transparent"
         >
-          <View className="h-14 w-14 rounded-full bg-white" />
+          {isCapturing && processState === null ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <View className="h-14 w-14 rounded-full bg-white" />
+          )}
         </TouchableOpacity>
 
         {/* Spacer balances gallery icon */}

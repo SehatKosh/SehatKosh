@@ -1,10 +1,12 @@
 import BottomSheet, {
+  BottomSheetFooter,
+  BottomSheetFooterProps,
   BottomSheetScrollView,
   BottomSheetTextInput,
 } from "@gorhom/bottom-sheet";
 import { useLocalSearchParams, router } from "expo-router";
-import { AlertTriangle, Check, Plus, Trash2, X } from "lucide-react-native";
-import { useRef, useState, useMemo } from "react";
+import { AlertTriangle, Check, CheckCircle2, Plus, Trash2, X } from "lucide-react-native";
+import { useRef, useState, useMemo, useCallback } from "react";
 import { Alert, Image, Pressable, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -25,7 +27,14 @@ export default function OcrVerifyScreen() {
     { name: "Paracetamol", strength: "500mg", frequency: "As needed", duration: "3 days" },
   ]);
 
-  const snapPoints = useMemo(() => ["50%", "88%"], []);
+  const snapPoints = useMemo(() => ["60%", "92%"], []);
+
+  const hasContraindication = useMemo(
+    () => medications.some((m) => m.name.toLowerCase().includes("amoxicillin")),
+    [medications]
+  );
+
+  const isSaveDisabled = hasContraindication && !acknowledged;
 
   const expandForInput = () => sheetRef.current?.snapToIndex(1);
   const removeMedication = (index: number) =>
@@ -34,6 +43,51 @@ export default function OcrVerifyScreen() {
     );
 
   const topPadding = Math.max(insets.top, 16) + 8;
+
+  const renderFooter = useCallback(
+    (props: BottomSheetFooterProps) => (
+      <BottomSheetFooter {...props} bottomInset={0}>
+        <View
+          style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+          className="border-t border-slate-200 bg-white px-5 pt-3 shadow-lg"
+        >
+          {isSaveDisabled && (
+            <Text className="mb-2 text-center text-xs font-semibold text-red-600">
+              ⚠️ Please acknowledge the allergy conflict above to save
+            </Text>
+          )}
+          <TouchableOpacity
+            disabled={isSaveDisabled}
+            onPress={() =>
+              Alert.alert(
+                "Saved",
+                "The verified medication list was added to your records.",
+                [
+                  {
+                    text: "OK",
+                    onPress: () => router.replace("/(tabs)/records"),
+                  },
+                ]
+              )
+            }
+            className={`w-full flex-row items-center justify-center rounded-xl py-4 ${
+              !isSaveDisabled ? "bg-sky-600 active:bg-sky-700" : "bg-slate-200"
+            }`}
+          >
+            <CheckCircle2 color={!isSaveDisabled ? "#FFFFFF" : "#94A3B8"} size={18} />
+            <Text
+              className={`ml-2 text-center text-sm font-bold ${
+                !isSaveDisabled ? "text-white" : "text-slate-400"
+              }`}
+            >
+              Save Clinical Record ({medications.length} {medications.length === 1 ? "medication" : "medications"})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheetFooter>
+    ),
+    [insets.bottom, isSaveDisabled, medications.length]
+  );
 
   return (
     <View className="flex-1 bg-slate-950">
@@ -90,13 +144,14 @@ export default function OcrVerifyScreen() {
         enablePanDownToClose={false}
         backgroundStyle={{ backgroundColor: "#FFFFFF", borderRadius: 24 }}
         handleIndicatorStyle={{ backgroundColor: "#CBD5E1", width: 48 }}
+        footerComponent={renderFooter}
       >
         {/* Scrollable content — paddingBottom clears the floating save bar */}
         <BottomSheetScrollView
           contentContainerStyle={{
             paddingTop: 4,
             paddingHorizontal: 20,
-            paddingBottom: Math.max(insets.bottom, 16) + 80,
+            paddingBottom: Math.max(insets.bottom, 16) + 110,
           }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -109,53 +164,62 @@ export default function OcrVerifyScreen() {
           </Text>
 
           {/* Contraindication warning */}
-          <View className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4">
-            <View className="flex-row items-start">
-              <AlertTriangle color="#DC2626" size={21} />
-              <View className="ml-3 flex-1">
-                <Text className="text-xs font-bold tracking-wide text-red-700">
-                  CONTRAINDICATION DETECTED
-                </Text>
-                <Text className="mt-1 text-sm leading-5 text-red-700">
-                  <Text className="font-bold">Amoxicillin</Text> is a
-                  penicillin-class antibiotic. Your profile lists a severe
-                  allergy to Penicillin.
-                </Text>
-                <View className="mt-3 flex-row gap-2">
-                  <TouchableOpacity className="flex-1 rounded-xl border border-red-300 px-2 py-2">
-                    <Text className="text-center text-xs font-bold text-red-700">
-                      Flag to Doctor
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => removeMedication(0)}
-                    className="flex-1 rounded-xl bg-red-600 px-2 py-2"
-                  >
-                    <Text className="text-center text-xs font-bold text-white">
-                      Remove Medication
-                    </Text>
-                  </TouchableOpacity>
+          {hasContraindication && (
+            <View className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4">
+              <View className="flex-row items-start">
+                <AlertTriangle color="#DC2626" size={21} />
+                <View className="ml-3 flex-1">
+                  <Text className="text-xs font-bold tracking-wide text-red-700">
+                    CONTRAINDICATION DETECTED
+                  </Text>
+                  <Text className="mt-1 text-sm leading-5 text-red-700">
+                    <Text className="font-bold">Amoxicillin</Text> is a
+                    penicillin-class antibiotic. Your profile lists a severe
+                    allergy to Penicillin.
+                  </Text>
+                  <View className="mt-3 flex-row gap-2">
+                    <TouchableOpacity className="flex-1 rounded-xl border border-red-300 px-2 py-2">
+                      <Text className="text-center text-xs font-bold text-red-700">
+                        Flag to Doctor
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const amoxicillinIndex = medications.findIndex((m) =>
+                          m.name.toLowerCase().includes("amoxicillin")
+                        );
+                        if (amoxicillinIndex !== -1) {
+                          removeMedication(amoxicillinIndex);
+                        }
+                      }}
+                      className="flex-1 rounded-xl bg-red-600 px-2 py-2"
+                    >
+                      <Text className="text-center text-xs font-bold text-white">
+                        Remove Medication
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
-            <TouchableOpacity
-              onPress={() => setAcknowledged((v) => !v)}
-              className="mt-3 flex-row items-center"
-            >
-              <View
-                className={`mr-2 h-5 w-5 items-center justify-center rounded border ${
-                  acknowledged
-                    ? "border-red-600 bg-red-600"
-                    : "border-red-400 bg-white"
-                }`}
+              <TouchableOpacity
+                onPress={() => setAcknowledged((v) => !v)}
+                className="mt-3 flex-row items-center"
               >
-                {acknowledged && <Check color="#FFFFFF" size={14} />}
-              </View>
-              <Text className="flex-1 text-xs font-medium text-red-700">
-                I acknowledge this allergy conflict.
-              </Text>
-            </TouchableOpacity>
-          </View>
+                <View
+                  className={`mr-2 h-5 w-5 items-center justify-center rounded border ${
+                    acknowledged
+                      ? "border-red-600 bg-red-600"
+                      : "border-red-400 bg-white"
+                  }`}
+                >
+                  {acknowledged && <Check color="#FFFFFF" size={14} />}
+                </View>
+                <Text className="flex-1 text-xs font-medium text-red-700">
+                  I acknowledge this allergy conflict.
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Medication cards */}
           {medications.map((medication, index) => (
@@ -168,7 +232,7 @@ export default function OcrVerifyScreen() {
                   Medication {index + 1}
                 </Text>
                 <TouchableOpacity
-                  accessibilityLabel={`Delete ${medication.name}`}
+                  accessibilityLabel={`Delete medication ${index + 1}`}
                   onPress={() => removeMedication(index)}
                   className="h-11 w-11 items-center justify-center"
                 >
@@ -179,12 +243,26 @@ export default function OcrVerifyScreen() {
                 <BottomSheetTextInput
                   defaultValue={medication.name}
                   onFocus={expandForInput}
+                  onChangeText={(val) => {
+                    setMedications((prev) =>
+                      prev.map((item, i) =>
+                        i === index ? { ...item, name: val } : item
+                      )
+                    );
+                  }}
                   className="flex-1 rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-900"
                   placeholder="Drug name"
                 />
                 <BottomSheetTextInput
                   defaultValue={medication.strength}
                   onFocus={expandForInput}
+                  onChangeText={(val) => {
+                    setMedications((prev) =>
+                      prev.map((item, i) =>
+                        i === index ? { ...item, strength: val } : item
+                      )
+                    );
+                  }}
                   className="w-24 rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-900"
                   placeholder="Strength"
                 />
@@ -192,12 +270,26 @@ export default function OcrVerifyScreen() {
               <BottomSheetTextInput
                 defaultValue={medication.frequency}
                 onFocus={expandForInput}
+                onChangeText={(val) => {
+                  setMedications((prev) =>
+                    prev.map((item, i) =>
+                      i === index ? { ...item, frequency: val } : item
+                    )
+                  );
+                }}
                 className="mt-2 rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-900"
                 placeholder="Frequency / timing"
               />
               <BottomSheetTextInput
                 defaultValue={medication.duration}
                 onFocus={expandForInput}
+                onChangeText={(val) => {
+                  setMedications((prev) =>
+                    prev.map((item, i) =>
+                      i === index ? { ...item, duration: val } : item
+                    )
+                  );
+                }}
                 className="mt-2 rounded-xl border border-slate-200 px-3 py-3 text-sm text-slate-900"
                 placeholder="Duration"
               />
@@ -212,7 +304,7 @@ export default function OcrVerifyScreen() {
                 { name: "", strength: "", frequency: "", duration: "" },
               ])
             }
-            className="mt-4 flex-row items-center justify-center rounded-xl border border-sky-200 py-3"
+            className="mt-4 flex-row items-center justify-center rounded-xl border border-sky-200 bg-sky-50/50 py-3.5"
           >
             <Plus color="#0284C7" size={18} />
             <Text className="ml-2 text-sm font-bold text-sky-700">
@@ -220,34 +312,8 @@ export default function OcrVerifyScreen() {
             </Text>
           </TouchableOpacity>
         </BottomSheetScrollView>
-
-        {/* ── Floating Save Bar ────────────────────────────── */}
-        <View
-          style={{ paddingBottom: Math.max(insets.bottom, 16) }}
-          className="absolute bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 px-5 pt-3"
-        >
-          <TouchableOpacity
-            disabled={!acknowledged}
-            onPress={() =>
-              Alert.alert(
-                "Saved",
-                "The verified medication list was added to your records."
-              )
-            }
-            className={`w-full rounded-xl py-4 ${
-              acknowledged ? "bg-sky-600" : "bg-slate-200"
-            }`}
-          >
-            <Text
-              className={`text-center text-sm font-bold ${
-                acknowledged ? "text-white" : "text-slate-400"
-              }`}
-            >
-              Save Clinical Record
-            </Text>
-          </TouchableOpacity>
-        </View>
       </BottomSheet>
     </View>
   );
 }
+

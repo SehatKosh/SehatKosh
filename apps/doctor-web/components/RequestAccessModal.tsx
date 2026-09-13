@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Loader2, SendHorizonal, CheckCircle2, Smartphone } from "lucide-react";
 import {
   Dialog,
@@ -12,6 +12,7 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import type { Patient } from "@/lib/mockData";
+import { useToast } from "./ToastProvider";
 
 interface RequestAccessModalProps {
   open: boolean;
@@ -39,16 +40,32 @@ export function RequestAccessModal({
   onOpenChange,
   preselectedPatient,
 }: RequestAccessModalProps) {
+  const { showToast } = useToast();
   const [step, setStep] = useState<"form" | "awaiting" | "approved">("form");
   const [patientId, setPatientId] = useState(preselectedPatient?.medicalId ?? "");
   const [scope, setScope] = useState<Scope>("full_history");
   const [duration, setDuration] = useState<Duration>("24h");
   const [purpose, setPurpose] = useState("");
 
+  useEffect(() => {
+    if (preselectedPatient?.medicalId) {
+      setPatientId(preselectedPatient.medicalId);
+    }
+  }, [preselectedPatient]);
+
   const handleSubmit = () => {
-    setStep("awaiting");
-    // Simulate patient approving after 3 seconds
-    setTimeout(() => setStep("approved"), 3000);
+    try {
+      setStep("awaiting");
+      showToast("Access dispatch sent to patient device", "info");
+      // Simulate patient approving after 2.5 seconds
+      setTimeout(() => {
+        setStep("approved");
+        showToast("Access Granted by Patient!", "success");
+      }, 2500);
+    } catch (e) {
+      console.warn("RequestAccessModal submit error:", e);
+      setStep("form");
+    }
   };
 
   const handleClose = () => {

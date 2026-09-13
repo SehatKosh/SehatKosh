@@ -215,7 +215,7 @@ export function PatientTable({ patients, onRequestAccess }: PatientTableProps) {
                     <div className="flex items-center justify-end gap-2">
                       {patient.accessStatus === "active" || patient.accessStatus === "expired" ? (
                         <>
-                          <Link href={`/patients/${patient.id}`}>
+                          <Link href={`/doctor/patients/${patient.id}`}>
                             <Button size="sm" className="text-xs">
                               Open Dossier
                               <ChevronRight className="h-3.5 w-3.5" />

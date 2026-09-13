@@ -709,3 +709,185 @@ export function getQueueForDoctor(): QueueItem[] {
 export function getOnDutyDoctors(): HospitalStaff[] {
   return MOCK_HOSPITAL_STAFF.filter((s) => s.role === "doctor" && s.onDuty);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SUPER ADMIN — Hospital Licensing, Quorum, Platform Metrics
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface HospitalLicenseRequest {
+  id: string;
+  hospitalName: string;
+  city: string;
+  province: string;
+  accreditationId: string;
+  adminContact: string;
+  adminEmail: string;
+  submittedAt: string;
+  status: "pending" | "approved" | "rejected";
+  bedCount: number;
+  type: "Teaching" | "Private" | "Government";
+}
+
+export interface QuorumAction {
+  id: string;
+  title: string;
+  description: string;
+  requestedBy: string;
+  requestedAt: string;
+  signoffs: string[];
+  requiredSignoffs: number;
+  status: "pending" | "confirmed" | "cancelled";
+  severity: "critical" | "high";
+}
+
+export interface SuperAdminMetrics {
+  connectedHospitals: number;
+  registeredPhysicians: number;
+  activeConsents: number;
+  researchExportsIssued: number;
+  pendingLicenseRequests: number;
+  quorumActionsOpen: number;
+}
+
+export const MOCK_SUPER_ADMIN_METRICS: SuperAdminMetrics = {
+  connectedHospitals: 14,
+  registeredPhysicians: 387,
+  activeConsents: 1042,
+  researchExportsIssued: 29,
+  pendingLicenseRequests: 3,
+  quorumActionsOpen: 1,
+};
+
+export const MOCK_HOSPITAL_LICENSES: HospitalLicenseRequest[] = [
+  {
+    id: "lic-001",
+    hospitalName: "Aga Khan University Hospital",
+    city: "Karachi",
+    province: "Sindh",
+    accreditationId: "AKUH-PKR-0012",
+    adminContact: "Dr. Farrukh Qureshi",
+    adminEmail: "admin@akuh.edu.pk",
+    submittedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    status: "pending",
+    bedCount: 700,
+    type: "Teaching",
+  },
+  {
+    id: "lic-002",
+    hospitalName: "Services Hospital Lahore",
+    city: "Lahore",
+    province: "Punjab",
+    accreditationId: "SHL-PKR-0087",
+    adminContact: "Dr. Nadia Siddiqui",
+    adminEmail: "hrd@serviceshospital.pk",
+    submittedAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    status: "pending",
+    bedCount: 1500,
+    type: "Government",
+  },
+  {
+    id: "lic-003",
+    hospitalName: "Hayatabad Medical Complex",
+    city: "Peshawar",
+    province: "KPK",
+    accreditationId: "HMC-PKR-0043",
+    adminContact: "Col. (r) Asif Durrani",
+    adminEmail: "director@hmc.edu.pk",
+    submittedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
+    status: "pending",
+    bedCount: 1100,
+    type: "Teaching",
+  },
+  {
+    id: "lic-004",
+    hospitalName: "Liaquat National Hospital",
+    city: "Karachi",
+    province: "Sindh",
+    accreditationId: "LNH-PKR-0021",
+    adminContact: "Prof. Zahid Farouk",
+    adminEmail: "it@lnh.edu.pk",
+    submittedAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
+    status: "approved",
+    bedCount: 800,
+    type: "Teaching",
+  },
+];
+
+export const MOCK_QUORUM_ACTIONS: QuorumAction[] = [
+  {
+    id: "qrm-001",
+    title: "Purge Regional Database — KPK Node",
+    description:
+      "Force-purge of the Khyber Pakhtunkhwa regional patient ledger node following a critical data integrity audit finding. Action is irreversible and will require data re-ingestion from hospital backups.",
+    requestedBy: "Super Admin (Session: SA-001)",
+    requestedAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+    signoffs: ["Super Admin (Session: SA-001)"],
+    requiredSignoffs: 2,
+    status: "pending",
+    severity: "critical",
+  },
+  {
+    id: "qrm-002",
+    title: "Revoke Facility License — Expired Accreditation",
+    description:
+      "Revoke SehatKosh platform access for a facility whose PMDC accreditation has expired. All linked physician accounts will be suspended until re-verification.",
+    requestedBy: "Super Admin (Session: SA-002)",
+    requestedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    signoffs: ["Super Admin (Session: SA-002)", "Super Admin (Session: SA-001)"],
+    requiredSignoffs: 2,
+    status: "confirmed",
+    severity: "high",
+  },
+];
+
+export interface ResearchClearinghouseRequest {
+  id: string;
+  caseRef: string;
+  requestingDoctor: string;
+  requestingDoctorId: string;
+  department: string;
+  purpose: string;
+  submittedAt: string;
+  status: "pending" | "forwarded" | "rejected";
+  patientAgeRange: string;
+  condition: string;
+}
+
+export const MOCK_CLEARINGHOUSE_REQUESTS: ResearchClearinghouseRequest[] = [
+  {
+    id: "req-001",
+    caseRef: "SUBJECT-ANON-9042",
+    requestingDoctor: "Dr. Tariq Khan",
+    requestingDoctorId: "dr-001",
+    department: "Cardiology",
+    purpose: "Teaching case for final-year medical students on bronchitis management with allergy contraindication.",
+    submittedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    status: "pending",
+    patientAgeRange: "20–25",
+    condition: "Acute Bacterial Bronchitis",
+  },
+  {
+    id: "req-002",
+    caseRef: "SUBJECT-ANON-3817",
+    requestingDoctor: "Dr. Ayesha Malik",
+    requestingDoctorId: "dr-002",
+    department: "Endocrinology",
+    purpose: "Longitudinal study on HbA1c management patterns in T2DM patients in Pakistan.",
+    submittedAt: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+    status: "forwarded",
+    patientAgeRange: "30–35",
+    condition: "Type 2 Diabetes Mellitus",
+  },
+  {
+    id: "req-003",
+    caseRef: "SUBJECT-ANON-7291",
+    requestingDoctor: "Dr. Usman Farooq",
+    requestingDoctorId: "dr-003",
+    department: "Pulmonology",
+    purpose: "COPD GOLD staging treatment comparison for pulmonary rehabilitation research paper.",
+    submittedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    status: "pending",
+    patientAgeRange: "55–60",
+    condition: "COPD GOLD Stage II",
+  },
+];

@@ -1,16 +1,25 @@
 "use client";
 
 import React, { useState } from "react";
-import { Users, CheckCircle2, XCircle, Plus, Trash2 } from "lucide-react";
+import { Users, CheckCircle2, XCircle, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MOCK_HOSPITAL_STAFF, type HospitalStaff } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 
+// Super Admin view of the roster — read-only with limited controls
+// Full management is in /hospital-admin/roster
+
 export default function AdminRosterPage() {
   const [staff, setStaff] = useState<HospitalStaff[]>(MOCK_HOSPITAL_STAFF);
+  const [toast, setToast] = useState<string | null>(null);
 
   const doctors = staff.filter((s) => s.role === "doctor");
   const registrars = staff.filter((s) => s.role === "registrar");
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const toggleDuty = (id: string) => {
     setStaff((prev) =>
@@ -19,20 +28,36 @@ export default function AdminRosterPage() {
   };
 
   const revokeRegistrar = (id: string) => {
+    const member = staff.find((s) => s.id === id);
     setStaff((prev) => prev.filter((s) => s.id !== id));
+    showToast(`Credentials revoked for ${member?.name ?? "staff member"}. Action logged in audit ledger.`);
   };
 
   return (
     <div className="p-6 max-w-5xl mx-auto w-full space-y-6">
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-lg border bg-slate-900 border-slate-700 text-white text-sm font-semibold">
+          <CheckCircle2 className="h-4 w-4 text-green-400" />
+          {toast}
+        </div>
+      )}
+
       {/* Header */}
       <div className="border-b border-border pb-5">
         <div className="flex items-center gap-2.5 mb-0.5">
           <div className="h-8 w-8 rounded-lg bg-violet-100 flex items-center justify-center">
             <Users className="h-4 w-4 text-violet-700" />
           </div>
-          <h1 className="text-xl font-bold text-foreground">Physician & Counter Staff Roster</h1>
+          <h1 className="text-xl font-bold text-foreground">Platform Staff Overview</h1>
         </div>
-        <p className="text-xs text-muted-foreground">Manage department assignments, room numbers, and on-duty availability</p>
+        <p className="text-xs text-muted-foreground">Super Admin view · Full staff management available in Hospital Admin portal</p>
+      </div>
+
+      {/* Info banner */}
+      <div className="bg-violet-50 border border-violet-200 rounded-xl p-3 flex items-start gap-2 text-xs text-violet-800">
+        <AlertTriangle className="h-4 w-4 text-violet-600 shrink-0 mt-0.5" />
+        <p>As Super Admin you can revoke credentials and toggle duty status. To add new staff or manage room assignments, use the <strong>Hospital Admin → Staff & Credentials</strong> portal.</p>
       </div>
 
       {/* Doctors */}
@@ -85,7 +110,13 @@ export default function AdminRosterPage() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold text-foreground">Desk Registrar Credentials ({registrars.length})</h2>
-          <Button size="sm" variant="outline" className="gap-2 text-xs" id="add-registrar-btn">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2 text-xs"
+            onClick={() => showToast("To add registrars, use Hospital Admin → Staff & Credentials.")}
+            id="add-registrar-btn"
+          >
             <Plus className="h-3.5 w-3.5" /> Add Registrar
           </Button>
         </div>
@@ -94,7 +125,7 @@ export default function AdminRosterPage() {
             <div key={r.id} className="bg-white border border-border rounded-xl px-4 py-3 flex items-center gap-4">
               <div className="h-9 w-9 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
                 <span className="text-xs font-bold text-emerald-700">
-                  {r.name.split(" ").map((n) => n[0]).join("")}
+                  {(r.name ?? "").split(" ").map((n) => n[0]).join("").slice(0, 2)}
                 </span>
               </div>
               <div className="flex-1 min-w-0">

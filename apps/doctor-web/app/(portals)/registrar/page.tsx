@@ -1,15 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
-import { UserCheck, ShieldOff, CheckCircle2 } from "lucide-react";
+import { UserCheck, ShieldOff, CheckCircle2, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PatientLookup } from "@/components/registrar/PatientLookup";
 import { ConsentPollingCard } from "@/components/registrar/ConsentPollingCard";
 import { BreakGlassModal } from "@/components/registrar/BreakGlassModal";
+import { NewPatientModal } from "@/components/registrar/NewPatientModal";
 import type { Patient } from "@/lib/mockData";
 import { MOCK_HOSPITAL_STAFF } from "@/lib/mockData";
 
-type Stage = "lookup" | "polling" | "queued";
+type Stage = "lookup" | "polling" | "queued" | "enrolled";
 
 export default function RegistrarPage() {
   const [stage, setStage] = useState<Stage>("lookup");
@@ -17,6 +18,8 @@ export default function RegistrarPage() {
   const [dispatchedDoctorId, setDispatchedDoctorId] = useState("");
   const [dispatchedDuration, setDispatchedDuration] = useState("4h");
   const [breakGlassOpen, setBreakGlassOpen] = useState(false);
+  const [newPatientOpen, setNewPatientOpen] = useState(false);
+  const [enrolledInfo, setEnrolledInfo] = useState<{ name: string; mrn: string } | null>(null);
 
   const doctor = MOCK_HOSPITAL_STAFF.find((s) => s.id === dispatchedDoctorId);
 
@@ -29,6 +32,12 @@ export default function RegistrarPage() {
 
   const handleAddToQueue = () => setStage("queued");
   const handleReset = () => { setStage("lookup"); setDispatchedPatient(null); };
+
+  const handleEnrolled = (name: string, mrn: string) => {
+    setEnrolledInfo({ name, mrn });
+    setNewPatientOpen(false);
+    setStage("enrolled");
+  };
 
   return (
     <div className="p-6 max-w-2xl mx-auto w-full space-y-5">
@@ -45,21 +54,36 @@ export default function RegistrarPage() {
             Sana Perveen · Front Desk · Shifa International Hospital
           </p>
         </div>
-        <Button
-          variant="destructive"
-          size="sm"
-          className="gap-2 text-xs"
-          onClick={() => setBreakGlassOpen(true)}
-          id="break-glass-trigger"
-        >
-          <ShieldOff className="h-3.5 w-3.5" />
-          Emergency Break-Glass
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 text-xs border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+            onClick={() => setNewPatientOpen(true)}
+            id="new-patient-btn"
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            New Patient
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="gap-2 text-xs"
+            onClick={() => setBreakGlassOpen(true)}
+            id="break-glass-trigger"
+          >
+            <ShieldOff className="h-3.5 w-3.5" />
+            Emergency Break-Glass
+          </Button>
+        </div>
       </div>
 
       {/* Stage: Lookup */}
       {stage === "lookup" && (
-        <PatientLookup onDispatch={handleDispatch} />
+        <PatientLookup
+          onDispatch={handleDispatch}
+          onNewPatient={() => setNewPatientOpen(true)}
+        />
       )}
 
       {/* Stage: Polling */}
@@ -83,13 +107,32 @@ export default function RegistrarPage() {
             <CheckCircle2 className="h-7 w-7 text-green-600" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-foreground">{dispatchedPatient.name} added to queue</h2>
+            <h2 className="text-base font-bold text-foreground">{dispatchedPatient.name ?? "Patient"} added to queue</h2>
             <p className="text-xs text-muted-foreground mt-1">
-              Successfully assigned to <strong>{doctor?.name ?? "—"}</strong> ({doctor?.roomNumber}). <br />
+              Successfully assigned to <strong>{doctor?.name ?? "—"}</strong> ({doctor?.roomNumber ?? "—"}). <br />
               Access granted for <strong>{dispatchedDuration}</strong>.
             </p>
           </div>
           <Button onClick={handleReset} id="intake-another-btn">Intake Another Patient</Button>
+        </div>
+      )}
+
+      {/* Stage: Enrolled (new patient created) */}
+      {stage === "enrolled" && enrolledInfo && (
+        <div className="bg-white border border-border rounded-2xl p-8 text-center space-y-4 shadow-sm">
+          <div className="h-14 w-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
+            <UserPlus className="h-7 w-7 text-emerald-600" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-foreground">{enrolledInfo.name} enrolled successfully</h2>
+            <p className="text-xs text-muted-foreground mt-1">
+              New SehatKosh Medical ID assigned: <strong className="font-clinical text-primary">{enrolledInfo.mrn}</strong>
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Patient can now be searched by MRN, CNIC, or phone number.
+            </p>
+          </div>
+          <Button onClick={handleReset} id="intake-another-after-enroll-btn">Intake Another Patient</Button>
         </div>
       )}
 
@@ -98,6 +141,13 @@ export default function RegistrarPage() {
         open={breakGlassOpen}
         onOpenChange={setBreakGlassOpen}
         onGranted={() => setBreakGlassOpen(false)}
+      />
+
+      {/* New Patient modal */}
+      <NewPatientModal
+        open={newPatientOpen}
+        onClose={() => setNewPatientOpen(false)}
+        onEnrolled={handleEnrolled}
       />
     </div>
   );

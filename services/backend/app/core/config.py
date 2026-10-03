@@ -25,7 +25,9 @@ class Settings(BaseSettings):
     # Database
     # ------------------------------------------------------------------
     DATABASE_URL: str = Field(
-        default="postgresql+asyncpg://sehatkosh_admin:secure_password123@localhost:5432/sehatkosh_db"
+        default=(
+            "postgresql+asyncpg://sehatkosh_admin:secure_password123@localhost:5432/sehatkosh_db"
+        )
     )
 
     # ------------------------------------------------------------------

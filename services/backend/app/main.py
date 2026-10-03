@@ -77,3 +77,14 @@ app.add_middleware(
 # Routers
 # ---------------------------------------------------------------------------
 app.include_router(v1_router)
+
+
+@app.get("/", tags=["Root"])
+async def root():
+    """Root health and service discovery endpoint."""
+    return {
+        "service": "SehatKosh Core Backend",
+        "status": "online",
+        "version": "0.1.0",
+        "docs": "/docs",
+    }

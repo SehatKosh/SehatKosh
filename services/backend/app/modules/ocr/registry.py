@@ -36,8 +36,8 @@ def _load_plugin(dotpath: str) -> OCRProcessor:
         # Validate it actually satisfies the Protocol at runtime
         if not isinstance(instance, OCRProcessor):
             raise TypeError(
-                f"{dotpath} does not satisfy the OCRProcessor protocol. "
-                f"Ensure it implements async def extract_prescription(self, image_bytes: bytes) -> dict."
+                f"{dotpath} does not satisfy OCRProcessor protocol. "
+                "Ensure it implements async def extract_prescription(self, image_bytes: bytes)."
             )
 
         logger.info("OCR plugin loaded successfully: %s", dotpath)

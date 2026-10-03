@@ -7,8 +7,6 @@ are required. These tests must pass in CI before .github/workflows/ci.yml
 activates (Adjustment #1).
 """
 
-import io
-import asyncio
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport

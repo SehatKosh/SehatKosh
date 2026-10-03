@@ -161,3 +161,39 @@ async def test_list_engines_endpoint(client: AsyncClient):
     assert isinstance(engines, list)
     names = [e["name"] for e in engines]
     assert "mock" in names
+
+
+@pytest.mark.asyncio
+async def test_cors_allows_localhost_3000(client: AsyncClient):
+    """CORS middleware must allow requests from http://localhost:3000."""
+    response = await client.options(
+        "/api/v1/health",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert response.headers.get("access-control-allow-origin") == "http://localhost:3000"
+
+
+@pytest.mark.asyncio
+async def test_cors_allows_127_0_0_1_3000(client: AsyncClient):
+    """CORS middleware must allow requests from http://127.0.0.1:3000."""
+    response = await client.options(
+        "/api/v1/health",
+        headers={
+            "Origin": "http://127.0.0.1:3000",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+    assert response.headers.get("access-control-allow-origin") == "http://127.0.0.1:3000"
+
+
+@pytest.mark.asyncio
+async def test_root_endpoint_returns_online(client: AsyncClient):
+    """Root GET / endpoint must return online status and service metadata."""
+    response = await client.get("/")
+    assert response.status_code == 200
+    data = response.json()
+    assert data.get("status") == "online"
+    assert "SehatKosh" in data.get("service", "")

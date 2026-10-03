@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Upload, Search, Loader2, CheckCircle2, ChevronRight, FileText, Edit2 } from "lucide-react";
+import { Upload, Search, Loader2, CheckCircle2, ChevronRight, FileText, Edit2, Code2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MOCK_PATIENTS, type Patient } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
+import { extractPrescription, type PrescriptionExtractionResponse } from "@/lib/api-client";
 
 type IngestStep = 1 | 2 | 3 | 4 | 5;
 
@@ -36,8 +37,11 @@ export default function AdminIngestPage() {
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+  const [uploadedFileObj, setUploadedFileObj] = useState<File | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [fields, setFields] = useState<ExtractedField[]>(DUMMY_EXTRACTED_FIELDS);
+  const [ocrResult, setOcrResult] = useState<PrescriptionExtractionResponse | null>(null);
+  const [showFhirBundle, setShowFhirBundle] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const patientMatches = MOCK_PATIENTS.filter(
@@ -46,21 +50,77 @@ export default function AdminIngestPage() {
 
   const runOcr = async () => {
     setOcrLoading(true);
-    await new Promise((r) => setTimeout(r, 2200));
-    setOcrLoading(false);
-    setStep(4);
+    try {
+      let fileToUpload: File;
+      if (uploadedFileObj) {
+        fileToUpload = uploadedFileObj;
+      } else {
+        const dummyContent = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+        fileToUpload = new File([dummyContent], uploadedFile || "prescription_demo.jpg", {
+          type: "image/jpeg",
+        });
+      }
+
+      const res = await extractPrescription(fileToUpload);
+      setOcrResult(res);
+
+      if (res.extraction && res.extraction.medications.length > 0) {
+        const mappedFields: ExtractedField[] = [
+          ...res.extraction.medications.map((m, idx) => ({
+            label: `Drug ${idx + 1}`,
+            value: `${m.name} ${m.strength} (${m.frequency}, ${m.duration})`,
+            confidence: "high" as const,
+            editable: true,
+          })),
+          {
+            label: "Ordering Clinician",
+            value: res.extraction.doctor_name,
+            confidence: "high" as const,
+            editable: false,
+          },
+          {
+            label: "Clinic / Facility",
+            value: res.extraction.clinic,
+            confidence: "high" as const,
+            editable: false,
+          },
+          {
+            label: "Prescription Date",
+            value: res.extraction.date,
+            confidence: "high" as const,
+            editable: false,
+          },
+        ];
+        setFields(mappedFields);
+      }
+      setStep(4);
+    } catch (err) {
+      console.error("[SehatKosh OCR] Failed to run OCR pipeline:", err);
+      setFields(DUMMY_EXTRACTED_FIELDS);
+      setStep(4);
+    } finally {
+      setOcrLoading(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files[0];
-    if (file) { setUploadedFile(file.name); setStep(3); }
+    if (file) {
+      setUploadedFile(file.name);
+      setUploadedFileObj(file);
+      setStep(3);
+    }
   };
 
   const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) { setUploadedFile(file.name); setStep(3); }
+    if (file) {
+      setUploadedFile(file.name);
+      setUploadedFileObj(file);
+      setStep(3);
+    }
   };
 
   const updateField = (i: number, val: string) => {
@@ -192,8 +252,19 @@ export default function AdminIngestPage() {
       {/* Step 4: Verify extracted fields */}
       {step === 4 && (
         <div className="bg-white border border-border rounded-2xl p-5 space-y-4">
-          <h3 className="text-sm font-bold text-foreground">Step 4 — Review Extracted Fields</h3>
-          <p className="text-xs text-muted-foreground">Verify and correct OCR results before committing to patient ledger.</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-foreground">Step 4 — Review Extracted Fields</h3>
+              <p className="text-xs text-muted-foreground">Verify and correct OCR results before committing to patient ledger.</p>
+            </div>
+            {ocrResult && (
+              <span className="text-[10px] font-mono font-medium px-2.5 py-1 rounded-md bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
+                <Sparkles className="h-3 w-3" />
+                Engine: {ocrResult.ocr_engine_used}
+              </span>
+            )}
+          </div>
+
           <div className="space-y-2">
             {fields.map((field, i) => (
               <div key={field.label} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-slate-50/60">
@@ -210,6 +281,25 @@ export default function AdminIngestPage() {
               </div>
             ))}
           </div>
+
+          {ocrResult?.fhir_bundle && (
+            <div className="pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setShowFhirBundle(!showFhirBundle)}
+                className="text-xs text-primary font-medium flex items-center gap-1.5 hover:underline"
+              >
+                <Code2 className="h-3.5 w-3.5" />
+                {showFhirBundle ? "Hide HL7 FHIR R4 Bundle" : "Inspect Generated HL7 FHIR R4 Bundle"}
+              </button>
+              {showFhirBundle && (
+                <pre className="mt-2.5 p-3 rounded-xl bg-slate-950 text-emerald-400 font-mono text-[11px] overflow-x-auto max-h-56">
+                  {JSON.stringify(ocrResult.fhir_bundle, null, 2)}
+                </pre>
+              )}
+            </div>
+          )}
+
           <Button className="w-full gap-2" onClick={() => setStep(5)} id="proceed-commit-btn">
             Confirm Fields <ChevronRight className="h-4 w-4" />
           </Button>

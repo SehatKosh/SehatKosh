@@ -1,8 +1,14 @@
 services:
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL — Relational database (patient records, appointments)
+  # Profile: core (always started)
+  # --------------------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
     container_name: sehatkosh-postgres
     restart: always
+    profiles: ["core", "full"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-sehatkosh_admin}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password123}
@@ -11,11 +17,37 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sehatkosh_admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # --------------------------------------------------------------------------
+  # LocalStack — S3-compatible object storage for prescription images
+  # Profile: core (always started)
+  # --------------------------------------------------------------------------
+  localstack:
+    image: localstack/localstack:latest
+    container_name: sehatkosh-localstack
+    profiles: ["core", "full"]
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3
+      - DEFAULT_REGION=${AWS_DEFAULT_REGION:-ap-southeast-1}
+    volumes:
+      - localstack_data:/var/lib/localstack
+
+  # --------------------------------------------------------------------------
+  # Neo4j — Graph database (drug interaction graph, SNOMED relationships)
+  # Profile: full (skipped for low-spec machines using 'core' profile)
+  # --------------------------------------------------------------------------
   neo4j:
     image: neo4j:5-community
     container_name: sehatkosh-neo4j
     restart: always
+    profiles: ["full"]
     environment:
       NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-secure_neo4j_password}
     ports:
@@ -23,37 +55,46 @@ services:
       - "7687:7687"
     volumes:
       - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p ${NEO4J_PASSWORD:-secure_neo4j_password} 'RETURN 1'"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
 
-  localstack:
-    image: localstack/localstack:latest
-    container_name: sehatkosh-localstack
-    ports:
-      - "4566:4566"
-    environment:
-      - SERVICES=s3
-      - DEFAULT_REGION=ap-southeast-1
-    volumes:
-      - localstack_data:/var/lib/localstack
-
+  # --------------------------------------------------------------------------
+  # Backend — FastAPI service
+  # Profile: full (run separately in dev via uvicorn for hot-reload)
+  # --------------------------------------------------------------------------
   backend:
     build:
       context: ../../services/backend
       dockerfile: Dockerfile
     container_name: sehatkosh-backend
     restart: on-failure
+    profiles: ["full"]
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://sehatkosh_admin:secure_password123@postgres:5432/sehatkosh_db
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-sehatkosh_admin}:${POSTGRES_PASSWORD:-secure_password123}@postgres:5432/${POSTGRES_DB:-sehatkosh_db}
       - NEO4J_URI=bolt://neo4j:7687
-      - NEO4J_USER=neo4j
-      - NEO4J_PASSWORD=secure_neo4j_password
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-secure_neo4j_password}
       - AWS_ENDPOINT_URL=http://localstack:4566
-      - AWS_DEFAULT_REGION=ap-southeast-1
+      - AWS_ENDPOINT_URL_EXTERNAL=${AWS_ENDPOINT_URL_EXTERNAL:-http://localhost:4566}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-mock_key}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-mock_secret}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-ap-southeast-1}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-sehatkosh-prescriptions}
+      - OCR_ENGINE=${OCR_ENGINE:-mock}
+      - FHIR_PARSER=${FHIR_PARSER:-mock}
+      - APP_ENV=${APP_ENV:-development}
     depends_on:
-      - postgres
-      - neo4j
-      - localstack
+      postgres:
+        condition: service_healthy
+      localstack:
+        condition: service_started
+      neo4j:
+        condition: service_healthy
 
 volumes:
   postgres_data:

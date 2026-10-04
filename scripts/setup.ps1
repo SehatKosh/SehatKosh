@@ -76,6 +76,22 @@ if (-not (Test-Path $backendEnv)) {
     Write-Host "${Green}✓ Backend .env already exists — skipping.${Reset}"
 }
 
+$frontendEnv = Join-Path $RepoRoot "apps\doctor-web\.env.local"
+$frontendEnvExample = Join-Path $RepoRoot "apps\doctor-web\.env.example"
+if (-not (Test-Path $frontendEnv)) {
+    if (Test-Path $frontendEnvExample) {
+        Copy-Item $frontendEnvExample $frontendEnv
+    } else {
+        @"
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_USE_MOCK=true
+"@ | Out-File -Encoding utf8 $frontendEnv
+    }
+    Write-Host "${Green}✓ Created apps/doctor-web/.env.local${Reset}"
+} else {
+    Write-Host "${Green}✓ Frontend .env.local already exists — skipping.${Reset}"
+}
+
 # ---------------------------------------------------------------------------
 # 3. Install JS/TS workspace dependencies
 # ---------------------------------------------------------------------------

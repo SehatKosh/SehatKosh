@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     FHIR_PARSER: str = Field(default="mock", description="FHIR adapter selector")
 
     # ------------------------------------------------------------------
+    # Telemetry Transformer
+    # ------------------------------------------------------------------
+    TELEMETRY_ENGINE: str = Field(default="mock", description="Telemetry adapter selector")
+
+    # ------------------------------------------------------------------
     # Database
     # ------------------------------------------------------------------
     DATABASE_URL: str = Field(

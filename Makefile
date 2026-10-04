@@ -1,10 +1,23 @@
-.PHONY: setup dev dev-core test lint clean help
+.PHONY: setup dev dev-core backend test lint clean help
 
 COMPOSE_FILE = infra/docker/docker-compose.yml
 BACKEND_DIR  = services/backend
-VENV         = $(BACKEND_DIR)/.venv
-PYTHON       = $(VENV)/bin/python
-PIP          = $(VENV)/bin/pip
+
+ifeq ($(OS),Windows_NT)
+    VENV_BIN = $(BACKEND_DIR)/.venv/Scripts
+    PYTHON   = $(VENV_BIN)/python.exe
+    PYTEST   = $(PYTHON) -m pytest
+    FLAKE8   = $(PYTHON) -m flake8
+    UVICORN  = $(PYTHON) -m uvicorn
+    SETUP_CMD = powershell -ExecutionPolicy RemoteSigned -File ./scripts/setup.ps1
+else
+    VENV_BIN = $(BACKEND_DIR)/.venv/bin
+    PYTHON   = $(VENV_BIN)/python
+    PYTEST   = $(VENV_BIN)/pytest
+    FLAKE8   = $(VENV_BIN)/flake8
+    UVICORN  = $(VENV_BIN)/uvicorn
+    SETUP_CMD = chmod +x scripts/setup.sh && ./scripts/setup.sh
+endif
 
 # ---------------------------------------------------------------------------
 # help — default target
@@ -19,7 +32,7 @@ help:
 	@echo "  make backend    Start FastAPI backend with hot-reload (no Docker)"
 	@echo "  make test       Run backend pytest + frontend typecheck"
 	@echo "  make lint       Run linters across entire monorepo"
-	@echo "  make clean      Remove build caches and node_modules"
+	@echo "  make clean      Remove build caches and virtual environments"
 	@echo "  ────────────────────────────────────────────────────────────"
 	@echo ""
 
@@ -27,8 +40,7 @@ help:
 # setup — one-command environment initialization
 # ---------------------------------------------------------------------------
 setup:
-	@chmod +x scripts/setup.sh
-	@./scripts/setup.sh
+	@$(SETUP_CMD)
 
 # ---------------------------------------------------------------------------
 # dev — full stack (all Docker profiles + all Turborepo apps)
@@ -50,15 +62,14 @@ dev-core:
 # Requires .venv to be set up via `make setup` first.
 # ---------------------------------------------------------------------------
 backend:
-	cd $(BACKEND_DIR) && \
-	  .venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+	cd $(BACKEND_DIR) && $(UVICORN) app.main:app --reload --host 0.0.0.0 --port 8000
 
 # ---------------------------------------------------------------------------
 # test
 # ---------------------------------------------------------------------------
 test:
 	@echo "=== Running Backend Tests ==="
-	cd $(BACKEND_DIR) && .venv/bin/pytest -v
+	cd $(BACKEND_DIR) && $(PYTEST) -v
 	@echo "=== Running Frontend Type Check ==="
 	pnpm --filter @sehatkosh/doctor-web exec tsc --noEmit || true
 
@@ -69,13 +80,11 @@ lint:
 	@echo "=== Frontend Lint (Turborepo) ==="
 	pnpm turbo run lint
 	@echo "=== Backend Lint (flake8) ==="
-	cd $(BACKEND_DIR) && .venv/bin/flake8 app/ --count --select=E9,F63,F7,F82 --show-source --statistics || true
+	cd $(BACKEND_DIR) && $(FLAKE8) app/ --count --select=E9,F63,F7,F82 --show-source --statistics || true
 
 # ---------------------------------------------------------------------------
 # clean
 # ---------------------------------------------------------------------------
 clean:
 	pnpm turbo run clean
-	find . -type d -name node_modules -not -path "*/\.*" -prune -exec rm -rf {} + 2>/dev/null || true
-	rm -rf $(BACKEND_DIR)/.venv $(BACKEND_DIR)/__pycache__ $(BACKEND_DIR)/app/**/__pycache__
 	@echo "Clean complete."

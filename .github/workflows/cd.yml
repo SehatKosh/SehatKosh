@@ -1,0 +1,107 @@
+name: SehatKosh Continuous Deployment
+
+on:
+  push:
+    branches: [main]
+
+# Only one deployment at a time — never overlap production deploys
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
+jobs:
+  # ============================================================
+  # Deploy Doctor Portal to Vercel
+  # Adjustment #2: All vercel CLI commands pass --cwd=apps/doctor-web
+  # to correctly target the Next.js workspace package inside the monorepo.
+  # ============================================================
+  deploy-doctor-web:
+    name: Deploy Doctor Portal → Vercel
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9.7.0
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install Monorepo Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      # Adjustment #2: --cwd=apps/doctor-web on all three vercel commands
+      # ensures the CLI reads the correct project config from the Next.js
+      # workspace rather than the monorepo root.
+      - name: Pull Vercel Environment
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          vercel pull \
+            --yes \
+            --environment=production \
+            --token=$VERCEL_TOKEN \
+            --cwd=apps/doctor-web
+
+      - name: Build for Production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          vercel build \
+            --prod \
+            --token=$VERCEL_TOKEN \
+            --cwd=apps/doctor-web
+
+      - name: Deploy Prebuilt to Vercel
+        id: deploy
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          DEPLOY_URL=$(vercel deploy \
+            --prebuilt \
+            --prod \
+            --token=$VERCEL_TOKEN \
+            --cwd=apps/doctor-web)
+          echo "DEPLOY_URL=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          echo "✅ Deployed to: $DEPLOY_URL"
+
+      - name: Comment Deployment URL on Commit
+        uses: actions/github-script@v7
+        if: success()
+        with:
+          script: |
+            const deployUrl = '${{ steps.deploy.outputs.DEPLOY_URL }}';
+            const sha = context.sha.substring(0, 7);
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: `🚀 **SehatKosh Doctor Portal deployed!**\n\n📎 **Live URL:** ${deployUrl}\n🔖 Commit: \`${sha}\``
+            });

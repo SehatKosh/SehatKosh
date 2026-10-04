@@ -12,7 +12,11 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 
 from app.main import app
-from app.core.dependencies import get_ocr_processor, get_fhir_transformer
+from app.core.dependencies import (
+    get_ocr_processor,
+    get_fhir_transformer,
+    get_telemetry_processor,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -27,6 +31,7 @@ async def client() -> AsyncClient:
     # Clear the lru_cache so each test session gets a fresh adapter
     get_ocr_processor.cache_clear()
     get_fhir_transformer.cache_clear()
+    get_telemetry_processor.cache_clear()
 
     async with AsyncClient(
         transport=ASGITransport(app=app),

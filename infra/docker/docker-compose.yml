@@ -38,6 +38,7 @@ services:
       - DEFAULT_REGION=${AWS_DEFAULT_REGION:-ap-southeast-1}
     volumes:
       - localstack_data:/var/lib/localstack
+      - ./init-s3.sh:/etc/localstack/init/ready.d/init-s3.sh
 
   # --------------------------------------------------------------------------
   # Neo4j — Graph database (drug interaction graph, SNOMED relationships)
@@ -74,6 +75,8 @@ services:
     profiles: ["full"]
     ports:
       - "8000:8000"
+    volumes:
+      - ../../services/backend:/app
     environment:
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-sehatkosh_admin}:${POSTGRES_PASSWORD:-secure_password123}@postgres:5432/${POSTGRES_DB:-sehatkosh_db}
       - NEO4J_URI=bolt://neo4j:7687

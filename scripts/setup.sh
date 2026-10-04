@@ -70,6 +70,20 @@ else
   echo -e "${GREEN}✓ Backend .env already exists — skipping.${NC}"
 fi
 
+if [ ! -f "$REPO_ROOT/apps/doctor-web/.env.local" ]; then
+  if [ -f "$REPO_ROOT/apps/doctor-web/.env.example" ]; then
+    cp "$REPO_ROOT/apps/doctor-web/.env.example" "$REPO_ROOT/apps/doctor-web/.env.local"
+  else
+    cat << 'EOF' > "$REPO_ROOT/apps/doctor-web/.env.local"
+NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_USE_MOCK=true
+EOF
+  fi
+  echo -e "${GREEN}✓ Created apps/doctor-web/.env.local${NC}"
+else
+  echo -e "${GREEN}✓ Frontend .env.local already exists — skipping.${NC}"
+fi
+
 # ---------------------------------------------------------------------------
 # 3. Install JS/TS workspace dependencies
 # ---------------------------------------------------------------------------

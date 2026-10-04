@@ -1,60 +1,69 @@
-# SehatKosh (صحت کوش)
+# 🏥 SehatKosh (صحت کوش) — Integrated Healthcare Management Platform
 
-SehatKosh is an integrated healthcare management platform built as a high-performance monorepo using **Turborepo** and **pnpm**. It contains a doctor-facing web portal and a patient-facing mobile application sharing common types, configurations, and mock data.
+SehatKosh is a modern, high-performance, modular healthcare platform built as a monorepo using **Turborepo** and **pnpm**. It integrates a **Doctor Web Portal**, a **Patient Mobile Application**, and a **Python FastAPI Backend** featuring pluggable OCR (prescription extraction), HL7 FHIR R4 transformation, and Wearable Telemetry processing.
 
 ---
 
-## 📁 Repository Structure
+## ⚡ Key Architecture Highlights
+
+- **Monorepo Architecture**: Managed via **Turborepo** & **pnpm** workspaces for fast, cached builds and shared package linking (`@sehatkosh/types`, `@sehatkosh/mock-data`, `@sehatkosh/tailwind-config`).
+- **Frontend Applications**:
+  - **Doctor Web Portal**: Next.js 14 (App Router), Tailwind CSS, Radix UI, TanStack React Query.
+  - **Patient Mobile App**: React Native (0.86), Expo SDK 57, Expo Router, NativeWind (Tailwind CSS).
+- **Backend Service**:
+  - **FastAPI Core**: Async Python 3.11+, Pydantic v2, PostgreSQL 16 (Relational DB), Neo4j 5 (Graph DB), LocalStack (S3 Object Storage).
+- **Modular Plug-and-Play Engines**:
+  - **OCR Engine**: Swappable prescription extraction engine with safety fallback protection (`mock` or `plugin:plugins.ocr...`).
+  - **FHIR R4 Transformer**: Standardized HL7 FHIR R4 Bundle conversion for interoperability.
+  - **Telemetry Parser**: Wearable & smartwatch health vitals normalization (`mock` or `plugin:plugins.telemetry...`).
+
+---
+
+## 📁 Repository Map
 
 ```text
 SehatKosh/
 ├── apps/
-│   ├── doctor-web/       # Doctor Web Portal (Next.js 14, Tailwind CSS, Radix UI)
-│   └── mobile/           # Patient Mobile App (React Native 0.86, Expo SDK 57, Expo Router, NativeWind)
+│   ├── doctor-web/           # Doctor Web Portal (Next.js 14, Tailwind CSS, Radix UI)
+│   └── mobile/               # Patient Mobile App (React Native, Expo SDK 57, NativeWind)
+├── services/
+│   └── backend/              # Core FastAPI backend (Python 3.11+, Pytest, AsyncPG, Pydantic)
+│       ├── app/              # Application logic (API v1, Modules, Models, Core Dependencies)
+│       ├── plugins/          # Teammate workspace for custom OCR & Telemetry plugins
+│       └── tests/            # Automated Pytest suite (30/30 unit & integration tests)
 ├── packages/
-│   ├── mock-data/        # Shared mock datasets for development and offline testing
-│   ├── tailwind-config/  # Shared Tailwind CSS design tokens and theme settings
-│   └── types/            # Shared TypeScript data models and API schemas
-├── pnpm-workspace.yaml   # Workspace definitions
-├── turbo.json            # Turborepo task pipeline configuration
-└── package.json          # Root scripts and workspace dependencies
+│   ├── mock-data/            # Shared clinical mock datasets for dev & offline testing
+│   ├── tailwind-config/      # Shared Tailwind CSS design tokens & theme settings
+│   └── types/                # Shared TypeScript data models and API schemas
+├── infra/
+│   └── docker/               # Docker Compose stack (PostgreSQL, LocalStack S3, Neo4j, Backend)
+├── scripts/
+│   ├── setup.sh              # 1-Command setup script for Linux / macOS / WSL
+│   └── setup.ps1             # 1-Command setup script for Windows PowerShell
+├── Makefile                  # Cross-platform developer commands (make setup, make dev, etc.)
+├── pnpm-workspace.yaml       # pnpm workspace definition
+└── turbo.json                # Turborepo task pipeline & caching configuration
 ```
 
 ---
 
-## 🛠️ Prerequisites
+## 📋 Prerequisites
 
 Before getting started, make sure you have the following installed on your machine:
 
-1. **Node.js (LTS version 20.x or 22.x recommended)**:
-   - Check version:
-     ```bash
-     node -v
-     ```
-   - Download: [nodejs.org](https://nodejs.org/)
-
-2. **pnpm (v9.7.0 recommended)**:
-   - Install globally via npm:
-     ```bash
-     npm install -g pnpm@9.7.0
-     ```
-   - Or enable via Corepack:
-     ```bash
-     corepack enable
-     corepack prepare pnpm@9.7.0 --activate
-     ```
-   - Check version:
-     ```bash
-     pnpm -v
-     ```
-
-3. **Mobile Development Tools (for `apps/mobile`)**:
-   - **Expo Go App**: Install **Expo Go (SDK 57)** on your physical iOS or Android device from the App Store / Google Play Store.
-   - *(Optional)* **Android Studio** (for Android Emulator) or **Xcode** (for iOS Simulator on macOS).
+| Tool | Recommended Version | Download / Install Command |
+| :--- | :--- | :--- |
+| **Node.js** | `v20.x` or `v22.x` (LTS) | [nodejs.org](https://nodejs.org/) |
+| **pnpm** | `v9.7.0` | `npm install -g pnpm@9.7.0` or `corepack enable` |
+| **Python** | `3.11+` | [python.org](https://python.org/) |
+| **Docker & Docker Compose** | Latest | [docker.com](https://www.docker.com/) |
+| **Expo Go** (Mobile testing) | SDK 57 Compatible | iOS App Store / Google Play Store |
 
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 Quick Start Guide (1-Command Setup)
+
+Follow the setup steps tailored for your operating system:
 
 ### 1. Clone the Repository
 
@@ -63,137 +72,209 @@ git clone https://github.com/<your-org>/SehatKosh.git
 cd SehatKosh
 ```
 
-### 2. (Windows Only) Set PowerShell Execution Policy
+---
 
-If you are on Windows and see an error like `cannot be loaded because running scripts is disabled on this system`, run PowerShell and execute:
+### 🪟 Windows Setup Guide
+
+#### Step 1: Set PowerShell Execution Policy (One-time setup)
+If running PowerShell scripts is disabled on your machine, open PowerShell and run:
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-### 3. Install Dependencies
+#### Step 2: Run Automated Setup Script
+Run the automated Windows setup script from the root directory:
 
-Install all dependencies across the entire monorepo with a single command from the root directory:
-
-```bash
-pnpm install
+```powershell
+.\scripts\setup.ps1
 ```
+*(Or run `pnpm setup` / `make setup` in PowerShell).*
 
-> **Note**: Do not use standard `npm install` directly in subfolders, as this project relies on `pnpm` workspaces for local package linking (`workspace:*`).
+**What this script does automatically:**
+- Validates prerequisites (`node` v20+, `pnpm`, `python`, `docker`).
+- Copies `.env.example` → `.env` in the root directory.
+- Copies `services/backend/.env.example` → `services/backend/.env`.
+- Auto-generates `apps/doctor-web/.env.local`.
+- Installs all JS/TS monorepo dependencies via `pnpm install`.
+- Creates Python `.venv` in `services/backend` and installs backend dependencies.
 
 ---
 
-## 🖥️ Running the Applications
+### 🐧 🍎 Linux & macOS Setup Guide
 
-You can run each application individually or run both simultaneously.
-
-### Option A: Run the Web UI (Doctor Portal)
-
-From the project root:
+#### Step 1: Run Automated Setup Script
+Make the setup script executable and run it from the root directory:
 
 ```bash
-pnpm run dev:web
+chmod +x scripts/setup.sh
+./scripts/setup.sh
 ```
+*(Or run `pnpm setup` / `make setup` in your terminal).*
 
-Or navigate to the web directory:
-
-```bash
-cd apps/doctor-web
-pnpm run dev
-```
-
-- **URL**: [http://localhost:3000](http://localhost:3000)
-- **Default Route**: Automatically routes to `/doctor/queue`
+**What this script does automatically:**
+- Validates prerequisites (`node` v20+, `pnpm`, `python3`, `docker`).
+- Copies `.env.example` → `.env` in the root directory.
+- Copies `services/backend/.env.example` → `services/backend/.env`.
+- Auto-generates `apps/doctor-web/.env.local`.
+- Installs all JS/TS monorepo dependencies via `pnpm install`.
+- Creates Python `.venv` in `services/backend` and installs backend dependencies.
 
 ---
 
-### Option B: Run the Mobile App (Expo Go SDK 57)
+## 🖥️ Running the Application Stack
 
-From the project root:
+Once setup is complete, you can launch the platform depending on your development workflow:
 
-```bash
-pnpm run dev:mobile
-```
+### Option 1: Full-Stack Development (Docker Infrastructure + Web + Mobile)
 
-Or navigate directly to the mobile directory:
+Start all database services (PostgreSQL, LocalStack S3, Neo4j) and launch all applications concurrently:
 
 ```bash
-cd apps/mobile
-npx expo start
+# Using Makefile
+make dev
+
+# OR using pnpm
+pnpm dev
 ```
 
-#### How to view the Mobile App:
-1. **Physical Device (Expo Go)**:
-   - Open the **Expo Go** app (must be SDK 57 compatible).
-   - Scan the QR code displayed in your terminal (ensure your phone and computer are on the same Wi-Fi network).
-   - If on separate networks or VPN, run `npx expo start --tunnel`.
-2. **Android Emulator**:
-   - Press <kbd>a</kbd> in the terminal running Expo.
-3. **iOS Simulator** (macOS only):
-   - Press <kbd>i</kbd> in the terminal running Expo.
+- **Doctor Web Portal**: [http://localhost:3000](http://localhost:3000)
+- **FastAPI Core Backend**: [http://localhost:8000](http://localhost:8000) (Interactive OpenAPI Docs: [http://localhost:8000/docs](http://localhost:8000/docs))
+- **Mobile App Metro Bundler**: [http://localhost:8081](http://localhost:8081)
 
 ---
 
-### Option C: Run Both Simultaneously
+### Option 2: Lightweight Development (`dev-core`)
 
-To start both the Web portal and the Mobile development server concurrently:
+Recommended for lower-spec laptops or when working strictly on UI features without running Neo4j:
 
 ```bash
-pnpm run dev
+# Using Makefile
+make dev-core
 ```
-
-Turborepo will spin up both servers in parallel:
-- Doctor Web at `http://localhost:3000`
-- Mobile Metro Bundler at `http://localhost:8081`
+Starts PostgreSQL + LocalStack S3 containers only, while launching the web & mobile dev servers.
 
 ---
 
-## 📜 Available Scripts
+### Option 3: Running Applications Individually
 
-Run these scripts from the repository root:
+#### A. Doctor Web Portal (Next.js 14)
+```bash
+pnpm dev:web
+```
+- Open [http://localhost:3000](http://localhost:3000) (routes automatically to `/doctor/queue`).
 
-| Command | Description |
+#### B. FastAPI Backend (Python Uvicorn)
+```bash
+# Using Makefile
+make backend
+
+# OR manually from services/backend:
+cd services/backend
+# Windows:
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# Linux/macOS:
+./.venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+#### C. Patient Mobile App (Expo SDK 57)
+```bash
+pnpm dev:mobile
+```
+- Open **Expo Go** on your physical phone and scan the QR code displayed in the terminal.
+- Press <kbd>a</kbd> for Android Emulator or <kbd>i</kbd> for iOS Simulator (macOS only).
+
+---
+
+## 🧪 Testing & Code Quality
+
+### Running Backend Unit & Integration Tests
+The backend features a comprehensive test suite (30 tests) powered by `pytest` and `httpx`:
+
+```bash
+# Using Makefile (Cross-platform)
+make test
+
+# OR using pnpm
+pnpm test
+```
+
+### Running Linters Across Monorepo
+```bash
+# Using Makefile
+make lint
+
+# OR using pnpm
+pnpm lint
+```
+
+---
+
+## 🔌 Teammate Plugin Workspace
+
+SehatKosh features a plug-and-play architecture for custom AI models and telemetry parsers. Teammates can drop custom adapters into `services/backend/plugins/` without modifying core backend code:
+
+```text
+services/backend/plugins/
+├── README.md               # Detailed teammate plugin guide
+├── ocr/
+│   └── template.py         # Starter template for custom OCR / VLM models
+└── telemetry/
+    └── template.py         # Starter template for smartwatch & BLE data
+```
+
+### How to Activate a Custom Plugin:
+1. Copy `services/backend/plugins/ocr/template.py` to `services/backend/plugins/ocr/my_model.py`.
+2. Implement your model logic inside `CustomOCRAdapter`.
+3. In `services/backend/.env`, set:
+   ```env
+   OCR_ENGINE=plugin:plugins.ocr.my_model.CustomOCRAdapter
+   ```
+4. Restart the backend server. If your plugin encounters an import error or throws an exception, **SehatKosh automatically falls back to `MockOCRAdapter` safely without crashing**.
+
+---
+
+## 📜 Complete Commands Reference
+
+| Command | Action / Description |
 | :--- | :--- |
-| `pnpm run dev` | Runs both Web and Mobile apps concurrently via Turborepo |
-| `pnpm run dev:web` | Starts only the Next.js Doctor Web application (`apps/doctor-web`) |
-| `pnpm run dev:mobile` | Starts the Expo Metro Bundler for Mobile (`apps/mobile`) |
-| `pnpm run build` | Builds all packages and applications |
-| `pnpm run lint` | Runs linters across all workspace projects |
-| `pnpm run clean` | Cleans build caches and removes `node_modules` |
+| `pnpm setup` / `make setup` | Runs 1-command environment initialization & dependency setup |
+| `pnpm dev` / `make dev` | Starts full stack (Docker containers + Web + Mobile apps) |
+| `make dev-core` | Starts lightweight stack (Postgres + S3 only + Web & Mobile apps) |
+| `pnpm dev:web` | Launches Doctor Web Portal only (`http://localhost:3000`) |
+| `pnpm dev:mobile` | Launches Expo Metro Bundler for Mobile (`http://localhost:8081`) |
+| `make backend` | Runs FastAPI backend with hot-reload via uvicorn (`http://localhost:8000`) |
+| `pnpm test` / `make test` | Runs Pytest suite (30 tests) + TypeScript type check |
+| `pnpm lint` / `make lint` | Runs ESLint / Turbo lint + Flake8 across codebase |
+| `pnpm build` | Builds all packages and web application for production |
+| `pnpm clean` / `make clean` | Cleans Turbo build caches and temporary build artifacts |
 
 ---
 
-## 🔧 Troubleshooting & Tips
+## 🔧 Troubleshooting & FAQ
 
-### 1. Port 3000 or 8081 is already in use
-If another application or zombie process is using the required ports:
+### 1. Port 3000 / 8000 / 8081 is already in use
+If another process is using required ports:
 - **Windows PowerShell**:
   ```powershell
-  # Find process using port 3000 or 8081
-  Get-NetTCPConnection -LocalPort 3000, 8081 -ErrorAction SilentlyContinue | Select-Object LocalPort, OwningProcess
-  
-  # Stop the process by PID
+  Get-NetTCPConnection -LocalPort 3000, 8000, 8081 -ErrorAction SilentlyContinue | Select-Object LocalPort, OwningProcess
   Stop-Process -Id <PID> -Force
   ```
-- **macOS / Linux**:
+- **Linux / macOS**:
   ```bash
-  lsof -ti:3000 | xargs kill -9
-  lsof -ti:8081 | xargs kill -9
+  lsof -ti:3000,8000,8081 | xargs kill -9
   ```
 
-### 2. Clearing the Metro Bundler Cache
-If changes to styles, NativeWind, or shared workspace packages aren't reflecting:
+### 2. Clearing Expo / Metro Bundler Cache
+If mobile styles or shared packages are not updating in Expo:
 ```bash
 cd apps/mobile
 npx expo start -c
 ```
 
-### 3. Clearing Next.js Cache
-```bash
-cd apps/doctor-web
-rm -rf .next
-pnpm run dev
+### 3. Vercel Deployment Output Directory Error (`.next was not found at /vercel/path0/.next`)
+In Vercel Dashboard → **Project Settings** → **General**, ensure **Root Directory** is set to:
+```text
+apps/doctor-web
 ```
-
-### 4. Expo Go SDK Version Mismatch
-If your phone's Expo Go app warns about SDK version incompatibility, verify that your Expo Go version matches **SDK 57**. You can check the current SDK version in [apps/mobile/package.json](apps/mobile/package.json) (`expo: ~57.0.20`).
+*(Ensure "Include source files outside of the Root Directory in the Build Step" is checked, and leave "Output Directory" default/disabled).*

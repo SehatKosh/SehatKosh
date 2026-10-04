@@ -52,8 +52,8 @@ jobs:
         run: npm install --global vercel@latest
 
       # Adjustment #2: --cwd=apps/doctor-web on all three vercel commands
-      # ensures the CLI reads the correct project config from the Next.js
-      # workspace rather than the monorepo root.
+      # Adjustment: Run from monorepo root without --cwd so Vercel CLI applies the
+      # Root Directory configured in Project Settings (apps/doctor-web) without path doubling.
       - name: Pull Vercel Environment
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN || secrets.ACTIONS_CD_TOKEN }}
@@ -63,8 +63,7 @@ jobs:
           vercel pull \
             --yes \
             --environment=production \
-            --token=$VERCEL_TOKEN \
-            --cwd=apps/doctor-web
+            --token=$VERCEL_TOKEN
 
       - name: Build for Production
         env:
@@ -74,8 +73,7 @@ jobs:
         run: |
           vercel build \
             --prod \
-            --token=$VERCEL_TOKEN \
-            --cwd=apps/doctor-web
+            --token=$VERCEL_TOKEN
 
       - name: Deploy Prebuilt to Vercel
         id: deploy
@@ -87,8 +85,7 @@ jobs:
           DEPLOY_URL=$(vercel deploy \
             --prebuilt \
             --prod \
-            --token=$VERCEL_TOKEN \
-            --cwd=apps/doctor-web)
+            --token=$VERCEL_TOKEN)
           echo "DEPLOY_URL=$DEPLOY_URL" >> $GITHUB_OUTPUT
           echo "✅ Deployed to: $DEPLOY_URL"
 

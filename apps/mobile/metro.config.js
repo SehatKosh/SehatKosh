@@ -37,7 +37,11 @@ config.cacheStores = [
   new FileStore({ root: path.join(projectRoot, ".metro-cache") }),
 ];
 
-module.exports = withNativeWind(config, { input: "./global.css" });
+module.exports = withNativeWind(config, {
+  input: path.resolve(projectRoot, "global.css"),
+  projectRoot: projectRoot,
+  configPath: path.resolve(projectRoot, "tailwind.config.js"),
+});
 
 
 

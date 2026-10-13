@@ -1,10 +1,34 @@
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { router } from "expo-router";
-import { Image as ImageIcon, X, Zap, ZapOff, Scan, FileSearch, ShieldCheck } from "lucide-react-native";
+import {
+  Image as ImageIcon,
+  X,
+  Zap,
+  ZapOff,
+  Scan,
+  FileSearch,
+  ShieldCheck,
+} from "lucide-react-native";
 import { useRef, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { extractPrescription } from "../../services/apiClient";
+import type { ExtractionResponse } from "@sehatkosh/types";
+
+// Processing state labels rendered in the extraction overlay
+const PROCESS_LABELS = [
+  "Scanning document geometry & contrast…",
+  "Extracting clinical text via Vision Pipeline…",
+  "Structuring FHIR MedicationRequest entities…",
+];
 
 export default function ScanDocumentScreen() {
   const cameraRef = useRef<CameraView>(null);
@@ -13,17 +37,56 @@ export default function ScanDocumentScreen() {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [processState, setProcessState] = useState<number | null>(null);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
-  const simulateExtraction = (uri: string) => {
+  /**
+   * Full extraction flow for a captured or picked image URI:
+   * 1. Show processing overlay (3 animated steps)
+   * 2. Call extractPrescription() to hit the backend (or get mock data)
+   * 3. Navigate to ocr-verify, passing the FHIR bundle & imageUri via params
+   */
+  const runExtraction = async (uri: string) => {
+    setExtractionError(null);
     setProcessState(0);
-    setTimeout(() => setProcessState(1), 700);
-    setTimeout(() => setProcessState(2), 1500);
-    setTimeout(() => {
-      setProcessState(null);
-      // Unmount camera gracefully by using replace instead of push, or just route push.
-      router.replace({ pathname: "/intake/ocr-verify", params: { imageUri: uri } });
-    }, 2200);
+
+    // Advance overlay through visual steps in parallel with real API call
+    const step1Timer = setTimeout(() => setProcessState(1), 700);
+    const step2Timer = setTimeout(() => setProcessState(2), 1500);
+
+    let extraction: ExtractionResponse | null = null;
+    try {
+      extraction = await extractPrescription(uri);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Unknown extraction error";
+      console.warn("[scan-document] extractPrescription failed:", message);
+      setExtractionError(message);
+      // Still navigate to verify screen; it will render with empty state
+    }
+
+    clearTimeout(step1Timer);
+    clearTimeout(step2Timer);
+
+    // Ensure overlay shows the final "FHIR" step for at least 400ms
+    setProcessState(2);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    setProcessState(null);
+    setIsCapturing(false);
+
+    // Serialise the extraction result to pass as route param.
+    // expo-router params must be strings; the verify screen deserialises.
+    const extractionParam = extraction
+      ? JSON.stringify(extraction)
+      : undefined;
+
+    router.replace({
+      pathname: "/intake/ocr-verify",
+      params: {
+        imageUri: uri,
+        ...(extractionParam ? { extraction: extractionParam } : {}),
+      },
+    });
   };
 
   const capture = async () => {
@@ -31,21 +94,24 @@ export default function ScanDocumentScreen() {
       await requestPermission();
       return;
     }
-    if (!isCameraReady || isCapturing) {
-      return;
-    }
+    if (!isCameraReady || isCapturing) return;
 
     try {
       setIsCapturing(true);
       const result = await cameraRef.current?.takePictureAsync({ quality: 0.8 });
       if (result?.uri) {
-        simulateExtraction(result.uri);
+        await runExtraction(result.uri);
       } else {
         setIsCapturing(false);
       }
-    } catch (error: any) {
-      console.warn("Camera photo capture error:", error);
-      Alert.alert("Camera Not Ready", "The camera is still initializing. Please try again in a moment.");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Camera capture error";
+      console.warn("Camera photo capture error:", message);
+      Alert.alert(
+        "Camera Not Ready",
+        "The camera is still initializing. Please try again in a moment."
+      );
       setIsCapturing(false);
     }
   };
@@ -58,7 +124,7 @@ export default function ScanDocumentScreen() {
     });
     if (!result.canceled && result.assets[0]) {
       setIsCapturing(true);
-      simulateExtraction(result.assets[0].uri);
+      await runExtraction(result.assets[0].uri);
     }
   };
 
@@ -94,21 +160,33 @@ export default function ScanDocumentScreen() {
 
       {/* Extraction Overlay */}
       {processState !== null && (
-        <View style={StyleSheet.absoluteFill} className="z-50 items-center justify-center bg-black/70 px-8">
+        <View
+          style={StyleSheet.absoluteFill}
+          className="z-50 items-center justify-center bg-black/70 px-8"
+        >
           <View className="w-full max-w-sm rounded-3xl bg-slate-900 p-8 items-center shadow-2xl border border-slate-800">
             {processState === 0 && <Scan size={48} color="#38BDF8" />}
             {processState === 1 && <FileSearch size={48} color="#38BDF8" />}
             {processState === 2 && <ShieldCheck size={48} color="#34D399" />}
-            
+
             {processState === 0 && (
-              <ActivityIndicator className="absolute top-8" size="large" color="#38BDF8" style={{ transform: [{ scale: 1.5 }], opacity: 0.3 }} />
+              <ActivityIndicator
+                className="absolute top-8"
+                size="large"
+                color="#38BDF8"
+                style={{ transform: [{ scale: 1.5 }], opacity: 0.3 }}
+              />
             )}
-            
+
             <Text className="mt-8 text-center text-base font-medium text-white">
-              {processState === 0 && "Scanning document geometry & contrast..."}
-              {processState === 1 && "Extracting clinical text via Vision Pipeline..."}
-              {processState === 2 && "Structuring FHIR MedicationRequest entities..."}
+              {PROCESS_LABELS[processState]}
             </Text>
+
+            {extractionError && (
+              <Text className="mt-3 text-center text-xs text-amber-400">
+                ⚠ Falling back to demo data
+              </Text>
+            )}
           </View>
         </View>
       )}

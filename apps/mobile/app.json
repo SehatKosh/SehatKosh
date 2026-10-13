@@ -19,7 +19,18 @@
     },
     "plugins": [
       "expo-router",
-      "expo-camera"
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SehatKosh to access your camera to scan prescriptions."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow SehatKosh to access your photos to select prescription documents."
+        }
+      ]
     ]
   }
 }

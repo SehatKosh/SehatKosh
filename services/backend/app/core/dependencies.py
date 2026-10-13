@@ -4,7 +4,7 @@ from app.core.config import settings
 from app.modules.ocr.interface import OCRProcessor
 from app.modules.ocr.registry import get_ocr_adapter
 from app.modules.fhir.interface import FHIRTransformer
-from app.modules.fhir.adapters import MockFHIRAdapter
+from app.modules.fhir.adapters import MockFHIRAdapter, ResilientFHIRAdapter
 from app.modules.telemetry.interface import TelemetryProcessor
 from app.modules.telemetry.registry import get_telemetry_adapter
 
@@ -26,11 +26,16 @@ def get_ocr_processor() -> OCRProcessor:
 def get_fhir_transformer() -> FHIRTransformer:
     """
     FastAPI dependency: resolve the configured FHIR transformer (cached).
-    Currently only the mock adapter is implemented; a live LLM-based
-    transformer will be added as a plugin in a future phase.
+
+    Selectors:
+      "mock"       → MockFHIRAdapter  (deterministic, for local dev / CI)
+      "resilient"  → ResilientFHIRAdapter (normalises arbitrary OCR output)
+      anything else → ResilientFHIRAdapter (safe default)
     """
-    # Future: support "plugin:<dotpath>" same as OCR engine
-    return MockFHIRAdapter()
+    selector = (settings.FHIR_PARSER or "mock").lower().strip()
+    if selector == "mock":
+        return MockFHIRAdapter()
+    return ResilientFHIRAdapter()
 
 
 @lru_cache(maxsize=1)

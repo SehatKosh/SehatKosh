@@ -121,14 +121,20 @@ async def test_extract_endpoint_returns_200_with_valid_jpeg(
     assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
     body = response.json()
 
-    assert "extraction" in body
-    assert "fhir_bundle" in body
-    assert "ocr_engine_used" in body
+    # New ExtractionResponse envelope: { status, data: { raw_ocr, fhir_bundle, metadata } }
+    assert body.get("status") == "success"
+    data = body.get("data", {})
+    assert "raw_ocr" in data, f"'raw_ocr' not found in data keys: {list(data.keys())}"
+    assert "fhir_bundle" in data, f"'fhir_bundle' not found in data keys: {list(data.keys())}"
+    assert "metadata" in data, f"'metadata' not found in data keys: {list(data.keys())}"
 
-    extraction = body["extraction"]
-    assert "doctor_name" in extraction
-    assert "medications" in extraction
-    assert isinstance(extraction["medications"], list)
+    raw_ocr = data["raw_ocr"]
+    assert "doctor_name" in raw_ocr
+    assert "medications" in raw_ocr
+    assert isinstance(raw_ocr["medications"], list)
+
+    fhir_bundle = data["fhir_bundle"]
+    assert fhir_bundle.get("resourceType") == "Bundle"
 
 
 @pytest.mark.asyncio

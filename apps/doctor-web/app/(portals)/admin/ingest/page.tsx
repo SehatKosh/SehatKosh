@@ -1,11 +1,22 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Upload, Search, Loader2, CheckCircle2, ChevronRight, FileText, Edit2, Code2, Sparkles } from "lucide-react";
+import {
+  Upload,
+  Search,
+  Loader2,
+  CheckCircle2,
+  ChevronRight,
+  FileText,
+  Code2,
+  Sparkles,
+  AlertTriangle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MOCK_PATIENTS, type Patient } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
-import { extractPrescription, type PrescriptionExtractionResponse } from "@/lib/api-client";
+import { extractPrescription, type ExtractionResponse } from "@/lib/api-client";
+import type { MedicationRequest } from "@sehatkosh/types";
 
 type IngestStep = 1 | 2 | 3 | 4 | 5;
 
@@ -31,6 +42,22 @@ const CONFIDENCE_BADGE: Record<string, string> = {
   low: "bg-red-100 text-red-700",
 };
 
+/** Narrow a bundle entry resource to MedicationRequest safely. */
+function isMedicationRequest(resource: unknown): resource is MedicationRequest {
+  return (
+    typeof resource === "object" &&
+    resource !== null &&
+    (resource as Record<string, unknown>).resourceType === "MedicationRequest"
+  );
+}
+
+/** Extract a concise dosage summary string from a MedicationRequest. */
+function getDosageSummary(mr: MedicationRequest): string {
+  const d = mr.dosageInstruction?.[0];
+  if (!d) return "";
+  return d.text || "";
+}
+
 export default function AdminIngestPage() {
   const [step, setStep] = useState<IngestStep>(1);
   const [patientQuery, setPatientQuery] = useState("");
@@ -40,13 +67,27 @@ export default function AdminIngestPage() {
   const [uploadedFileObj, setUploadedFileObj] = useState<File | null>(null);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [fields, setFields] = useState<ExtractedField[]>(DUMMY_EXTRACTED_FIELDS);
-  const [ocrResult, setOcrResult] = useState<PrescriptionExtractionResponse | null>(null);
+  const [ocrResult, setOcrResult] = useState<ExtractionResponse | null>(null);
   const [showFhirBundle, setShowFhirBundle] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const patientMatches = MOCK_PATIENTS.filter(
-    (p) => p.name.toLowerCase().includes(patientQuery.toLowerCase()) || p.medicalId.toLowerCase().includes(patientQuery.toLowerCase())
+    (p) =>
+      p.name.toLowerCase().includes(patientQuery.toLowerCase()) ||
+      p.medicalId.toLowerCase().includes(patientQuery.toLowerCase())
   );
+
+  // ── Derived signals from the new envelope ──────────────────────────────────
+
+  const needsClinicalReview =
+    (ocrResult?.data.metadata.unmapped_codes_count ?? 0) > 0;
+
+  const medicationRequests: MedicationRequest[] =
+    ocrResult?.data.fhir_bundle.entry
+      .map((e) => e.resource)
+      .filter(isMedicationRequest) ?? [];
+
+  // ── OCR pipeline runner ────────────────────────────────────────────────────
 
   const runOcr = async () => {
     setOcrLoading(true);
@@ -55,44 +96,67 @@ export default function AdminIngestPage() {
       if (uploadedFileObj) {
         fileToUpload = uploadedFileObj;
       } else {
+        // Demo-mode: send a minimal JPEG so the endpoint accepts it
         const dummyContent = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
-        fileToUpload = new File([dummyContent], uploadedFile || "prescription_demo.jpg", {
-          type: "image/jpeg",
-        });
+        fileToUpload = new File(
+          [dummyContent],
+          uploadedFile || "prescription_demo.jpg",
+          { type: "image/jpeg" }
+        );
       }
 
       const res = await extractPrescription(fileToUpload);
       setOcrResult(res);
 
-      if (res.extraction && res.extraction.medications.length > 0) {
-        const mappedFields: ExtractedField[] = [
-          ...res.extraction.medications.map((m, idx) => ({
-            label: `Drug ${idx + 1}`,
-            value: `${m.name} ${m.strength} (${m.frequency}, ${m.duration})`,
-            confidence: "high" as const,
-            editable: true,
-          })),
-          {
+      // ── Map FHIR bundle entries → ExtractedField rows ──────────────────
+      const medReqs = res.data.fhir_bundle.entry
+        .map((e) => e.resource)
+        .filter(isMedicationRequest);
+
+      if (medReqs.length > 0) {
+        const mappedFields: ExtractedField[] = medReqs.map((mr, idx) => ({
+          label: `Drug ${idx + 1}`,
+          value: [
+            mr.medicationCodeableConcept.text,
+            mr.dosageInstruction?.[0]?.text,
+          ]
+            .filter(Boolean)
+            .join(" — "),
+          confidence: mr.medicationCodeableConcept.coding.length > 0
+            ? ("high" as const)
+            : ("medium" as const),
+          editable: true,
+        }));
+
+        // Append scalar meta from raw_ocr if available
+        const raw = res.data.raw_ocr as Record<string, unknown>;
+        if (raw.doctor_name) {
+          mappedFields.push({
             label: "Ordering Clinician",
-            value: res.extraction.doctor_name,
-            confidence: "high" as const,
+            value: String(raw.doctor_name),
+            confidence: "high",
             editable: false,
-          },
-          {
+          });
+        }
+        if (raw.clinic) {
+          mappedFields.push({
             label: "Clinic / Facility",
-            value: res.extraction.clinic,
-            confidence: "high" as const,
+            value: String(raw.clinic),
+            confidence: "high",
             editable: false,
-          },
-          {
+          });
+        }
+        if (raw.date) {
+          mappedFields.push({
             label: "Prescription Date",
-            value: res.extraction.date,
-            confidence: "high" as const,
+            value: String(raw.date),
+            confidence: "high",
             editable: false,
-          },
-        ];
+          });
+        }
         setFields(mappedFields);
       }
+
       setStep(4);
     } catch (err) {
       console.error("[SehatKosh OCR] Failed to run OCR pipeline:", err);
@@ -124,7 +188,9 @@ export default function AdminIngestPage() {
   };
 
   const updateField = (i: number, val: string) => {
-    setFields((prev) => prev.map((f, idx) => idx === i ? { ...f, value: val } : f));
+    setFields((prev) =>
+      prev.map((f, idx) => (idx === i ? { ...f, value: val } : f))
+    );
   };
 
   const steps = ["Select Patient", "Upload Scan", "Run OCR", "Verify Fields", "Commit"];
@@ -137,9 +203,11 @@ export default function AdminIngestPage() {
           <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center">
             <Upload className="h-4 w-4 text-amber-700" />
           </div>
-          <h1 className="text-xl font-bold text-foreground">Paper Ingestion & OCR Desk</h1>
+          <h1 className="text-xl font-bold text-foreground">Paper Ingestion &amp; OCR Desk</h1>
         </div>
-        <p className="text-xs text-muted-foreground">Digitize physical prescriptions and hospital records via OCR pipeline</p>
+        <p className="text-xs text-muted-foreground">
+          Digitize physical prescriptions and hospital records via OCR → FHIR R4 pipeline
+        </p>
       </div>
 
       {/* Step progress */}
@@ -151,21 +219,41 @@ export default function AdminIngestPage() {
           return (
             <React.Fragment key={s}>
               <div className="flex flex-col items-center">
-                <div className={cn("h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold transition-all",
-                  done ? "bg-primary text-white" : active ? "bg-primary/10 text-primary border-2 border-primary" : "bg-slate-100 text-muted-foreground")}>
+                <div
+                  className={cn(
+                    "h-7 w-7 rounded-full flex items-center justify-center text-xs font-bold transition-all",
+                    done
+                      ? "bg-primary text-white"
+                      : active
+                      ? "bg-primary/10 text-primary border-2 border-primary"
+                      : "bg-slate-100 text-muted-foreground"
+                  )}
+                >
                   {done ? <CheckCircle2 className="h-4 w-4" /> : n}
                 </div>
-                <p className={cn("text-[10px] mt-1 font-medium", active ? "text-primary" : "text-muted-foreground")}>{s}</p>
+                <p
+                  className={cn(
+                    "text-[10px] mt-1 font-medium",
+                    active ? "text-primary" : "text-muted-foreground"
+                  )}
+                >
+                  {s}
+                </p>
               </div>
               {i < steps.length - 1 && (
-                <div className={cn("flex-1 h-0.5 mb-4 mx-1 transition-all", done ? "bg-primary" : "bg-slate-200")} />
+                <div
+                  className={cn(
+                    "flex-1 h-0.5 mb-4 mx-1 transition-all",
+                    done ? "bg-primary" : "bg-slate-200"
+                  )}
+                />
               )}
             </React.Fragment>
           );
         })}
       </div>
 
-      {/* Step 1: Patient selection */}
+      {/* ── Step 1: Patient selection ────────────────────────────────────────── */}
       {step === 1 && (
         <div className="bg-white border border-border rounded-2xl p-5 space-y-4">
           <h3 className="text-sm font-bold text-foreground">Step 1 — Select Patient</h3>
@@ -181,23 +269,32 @@ export default function AdminIngestPage() {
               id="ingest-patient-search"
             />
           </div>
-          {patientQuery && patientMatches.map((p) => (
-            <button key={p.id} onClick={() => { setSelectedPatient(p); setStep(2); }}
-              className="w-full text-left flex items-center gap-3 p-3 rounded-xl border border-border hover:border-primary/40 hover:bg-slate-50 transition-all">
-              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <span className="text-xs font-bold text-primary">{p.initials}</span>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-foreground">{p.name}</p>
-                <p className="text-xs text-muted-foreground">{p.medicalId} · {p.age}y {p.gender}</p>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto" />
-            </button>
-          ))}
+          {patientQuery &&
+            patientMatches.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => {
+                  setSelectedPatient(p);
+                  setStep(2);
+                }}
+                className="w-full text-left flex items-center gap-3 p-3 rounded-xl border border-border hover:border-primary/40 hover:bg-slate-50 transition-all"
+              >
+                <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <span className="text-xs font-bold text-primary">{p.initials}</span>
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{p.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {p.medicalId} · {p.age}y {p.gender}
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground ml-auto" />
+              </button>
+            ))}
         </div>
       )}
 
-      {/* Step 2: Upload */}
+      {/* ── Step 2: Upload ───────────────────────────────────────────────────── */}
       {step === 2 && selectedPatient && (
         <div className="bg-white border border-border rounded-2xl p-5 space-y-4">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -206,32 +303,64 @@ export default function AdminIngestPage() {
             <span>·</span>
             <span className="font-clinical">{selectedPatient.medicalId}</span>
           </div>
-          <h3 className="text-sm font-bold text-foreground">Step 2 — Upload Prescription Scan</h3>
+          <h3 className="text-sm font-bold text-foreground">
+            Step 2 — Upload Prescription Scan
+          </h3>
           <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             onClick={() => fileRef.current?.click()}
-            className={cn("border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all",
-              dragOver ? "border-primary bg-primary/5" : "border-border hover:border-primary/40 hover:bg-slate-50")}
+            className={cn(
+              "border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all",
+              dragOver
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/40 hover:bg-slate-50"
+            )}
           >
-            <FileText className={cn("h-10 w-10 mx-auto mb-3", dragOver ? "text-primary" : "text-muted-foreground")} />
-            <p className="text-sm font-semibold text-foreground">Drag & drop prescription scan</p>
-            <p className="text-xs text-muted-foreground mt-1">or click to browse · PDF, JPG, PNG accepted</p>
-            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={handleFileInput} id="ingest-file-input" />
+            <FileText
+              className={cn(
+                "h-10 w-10 mx-auto mb-3",
+                dragOver ? "text-primary" : "text-muted-foreground"
+              )}
+            />
+            <p className="text-sm font-semibold text-foreground">
+              Drag &amp; drop prescription scan
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              or click to browse · JPG, PNG accepted (max 10 MB)
+            </p>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".jpg,.jpeg,.png,.webp,.tiff"
+              className="hidden"
+              onChange={handleFileInput}
+              id="ingest-file-input"
+            />
           </div>
           {/* Demo bypass */}
-          <button onClick={() => { setUploadedFile("prescription_demo.jpg"); setStep(3); }}
-            className="w-full text-xs text-muted-foreground hover:text-primary text-center py-2 hover:underline">
+          <button
+            onClick={() => {
+              setUploadedFile("prescription_demo.jpg");
+              setStep(3);
+            }}
+            className="w-full text-xs text-muted-foreground hover:text-primary text-center py-2 hover:underline"
+          >
             Use demo scan (skip upload)
           </button>
         </div>
       )}
 
-      {/* Step 3: OCR trigger */}
+      {/* ── Step 3: OCR trigger ──────────────────────────────────────────────── */}
       {step === 3 && (
         <div className="bg-white border border-border rounded-2xl p-5 space-y-4">
-          <h3 className="text-sm font-bold text-foreground">Step 3 — Run OCR Pipeline</h3>
+          <h3 className="text-sm font-bold text-foreground">
+            Step 3 — Run OCR Pipeline
+          </h3>
           <div className="flex items-center gap-3 p-3 bg-slate-50 border border-border rounded-xl">
             <FileText className="h-5 w-5 text-primary shrink-0" />
             <p className="text-sm font-semibold text-foreground">{uploadedFile}</p>
@@ -239,50 +368,172 @@ export default function AdminIngestPage() {
           {ocrLoading ? (
             <div className="flex items-center justify-center gap-3 py-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              <p className="text-sm text-muted-foreground">Running SehatKosh OCR & FHIR parsing pipeline…</p>
+              <p className="text-sm text-muted-foreground">
+                Running SehatKosh OCR &amp; resilient FHIR R4 normalisation…
+              </p>
             </div>
           ) : (
             <Button className="w-full gap-2" onClick={runOcr} id="run-ocr-btn">
-              <Upload className="h-4 w-4" /> Trigger OCR & FHIR Parsing
+              <Upload className="h-4 w-4" /> Trigger OCR &amp; FHIR Parsing
             </Button>
           )}
         </div>
       )}
 
-      {/* Step 4: Verify extracted fields */}
+      {/* ── Step 4: Verify extracted fields ─────────────────────────────────── */}
       {step === 4 && (
         <div className="bg-white border border-border rounded-2xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
+          {/* Header row */}
+          <div className="flex items-start justify-between gap-3">
             <div>
-              <h3 className="text-sm font-bold text-foreground">Step 4 — Review Extracted Fields</h3>
-              <p className="text-xs text-muted-foreground">Verify and correct OCR results before committing to patient ledger.</p>
+              <h3 className="text-sm font-bold text-foreground">
+                Step 4 — Review Extracted Fields
+              </h3>
+              <p className="text-xs text-muted-foreground">
+                Verify and correct OCR results before committing to patient ledger.
+              </p>
             </div>
             {ocrResult && (
-              <span className="text-[10px] font-mono font-medium px-2.5 py-1 rounded-md bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
-                <Sparkles className="h-3 w-3" />
-                Engine: {ocrResult.ocr_engine_used}
-              </span>
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                <span className="text-[10px] font-mono font-medium px-2.5 py-1 rounded-md bg-primary/10 text-primary border border-primary/20 flex items-center gap-1.5">
+                  <Sparkles className="h-3 w-3" />
+                  {ocrResult.data.metadata.medications_detected} medication
+                  {ocrResult.data.metadata.medications_detected !== 1 ? "s" : ""} detected
+                </span>
+                {ocrResult.data.metadata.is_fallback && (
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                    raw-text fallback
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
+          {/* ── Clinical review warning badge ─────────────────────────────── */}
+          {needsClinicalReview && (
+            <div
+              className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3"
+              role="alert"
+              aria-label="clinical-review-warning"
+            >
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-amber-800">
+                  Needs Clinical Review: Unmapped Brand Names Detected
+                </p>
+                <p className="mt-0.5 text-[11px] leading-4 text-amber-700">
+                  {ocrResult?.data.metadata.unmapped_codes_count} medication
+                  {(ocrResult?.data.metadata.unmapped_codes_count ?? 0) > 1
+                    ? "s"
+                    : ""}{" "}
+                  could not be matched to a SNOMED-CT code. A clinician should
+                  verify before committing to the patient ledger.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── FHIR medication preview table ────────────────────────────── */}
+          {medicationRequests.length > 0 && (
+            <div className="rounded-xl border border-border overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-border">
+                    <th className="py-2 px-3 text-left font-semibold text-muted-foreground">
+                      Medication
+                    </th>
+                    <th className="py-2 px-3 text-left font-semibold text-muted-foreground">
+                      Dosage / Instructions
+                    </th>
+                    <th className="py-2 px-3 text-left font-semibold text-muted-foreground">
+                      SNOMED-CT
+                    </th>
+                    <th className="py-2 px-3 text-left font-semibold text-muted-foreground">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {medicationRequests.map((mr, idx) => {
+                    const hasSNOMED = mr.medicationCodeableConcept.coding.length > 0;
+                    const snomedCode = mr.medicationCodeableConcept.coding[0]?.code;
+                    return (
+                      <tr
+                        key={mr.id ?? idx}
+                        className="border-b border-border last:border-0 hover:bg-slate-50/60 transition-colors"
+                      >
+                        <td className="py-2.5 px-3 font-semibold text-foreground">
+                          {mr.medicationCodeableConcept.text}
+                        </td>
+                        <td className="py-2.5 px-3 text-muted-foreground font-clinical">
+                          {getDosageSummary(mr) || "—"}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {hasSNOMED ? (
+                            <span className="font-mono text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">
+                              {snomedCode}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                              unmapped
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span
+                            className={cn(
+                              "text-[10px] font-bold px-2 py-0.5 rounded-full",
+                              mr.status === "active"
+                                ? "bg-green-100 text-green-700"
+                                : "bg-slate-100 text-slate-500"
+                            )}
+                          >
+                            {mr.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* ── Editable extracted fields (legacy view) ───────────────────── */}
           <div className="space-y-2">
             {fields.map((field, i) => (
-              <div key={field.label} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-slate-50/60">
-                <p className="text-xs font-semibold text-muted-foreground w-36 shrink-0">{field.label}</p>
+              <div
+                key={field.label}
+                className="flex items-center gap-3 p-3 rounded-xl border border-border bg-slate-50/60"
+              >
+                <p className="text-xs font-semibold text-muted-foreground w-36 shrink-0">
+                  {field.label}
+                </p>
                 {field.editable ? (
-                  <input value={field.value} onChange={(e) => updateField(i, e.target.value)}
-                    className="flex-1 text-xs border border-border rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 font-clinical" />
+                  <input
+                    value={field.value}
+                    onChange={(e) => updateField(i, e.target.value)}
+                    className="flex-1 text-xs border border-border rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 font-clinical"
+                  />
                 ) : (
-                  <p className="flex-1 text-xs font-clinical text-foreground">{field.value}</p>
+                  <p className="flex-1 text-xs font-clinical text-foreground">
+                    {field.value}
+                  </p>
                 )}
-                <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0", CONFIDENCE_BADGE[field.confidence])}>
+                <span
+                  className={cn(
+                    "text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0",
+                    CONFIDENCE_BADGE[field.confidence]
+                  )}
+                >
                   {field.confidence}
                 </span>
               </div>
             ))}
           </div>
 
-          {ocrResult?.fhir_bundle && (
+          {/* ── Raw FHIR bundle inspector ─────────────────────────────────── */}
+          {ocrResult?.data.fhir_bundle && (
             <div className="pt-2 border-t border-border">
               <button
                 type="button"
@@ -290,35 +541,61 @@ export default function AdminIngestPage() {
                 className="text-xs text-primary font-medium flex items-center gap-1.5 hover:underline"
               >
                 <Code2 className="h-3.5 w-3.5" />
-                {showFhirBundle ? "Hide HL7 FHIR R4 Bundle" : "Inspect Generated HL7 FHIR R4 Bundle"}
+                {showFhirBundle
+                  ? "Hide HL7 FHIR R4 Bundle"
+                  : "Inspect Generated HL7 FHIR R4 Bundle"}
               </button>
               {showFhirBundle && (
                 <pre className="mt-2.5 p-3 rounded-xl bg-slate-950 text-emerald-400 font-mono text-[11px] overflow-x-auto max-h-56">
-                  {JSON.stringify(ocrResult.fhir_bundle, null, 2)}
+                  {JSON.stringify(ocrResult.data.fhir_bundle, null, 2)}
                 </pre>
               )}
             </div>
           )}
 
-          <Button className="w-full gap-2" onClick={() => setStep(5)} id="proceed-commit-btn">
+          <Button
+            className="w-full gap-2"
+            onClick={() => setStep(5)}
+            id="proceed-commit-btn"
+          >
             Confirm Fields <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       )}
 
-      {/* Step 5: Commit */}
+      {/* ── Step 5: Commit ───────────────────────────────────────────────────── */}
       {step === 5 && selectedPatient && (
         <div className="bg-white border border-border rounded-2xl p-8 text-center space-y-4">
           <div className="h-14 w-14 rounded-full bg-green-100 flex items-center justify-center mx-auto">
             <CheckCircle2 className="h-7 w-7 text-green-600" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-foreground">Record Committed to Patient Ledger</h2>
+            <h2 className="text-base font-bold text-foreground">
+              Record Committed to Patient Ledger
+            </h2>
             <p className="text-xs text-muted-foreground mt-1">
-              <strong>{fields.length} extracted fields</strong> have been written to <strong>{selectedPatient.name}</strong>&apos;s SehatKosh cloud record.
+              <strong>
+                {ocrResult?.data.metadata.medications_detected ?? fields.length} medication
+                {(ocrResult?.data.metadata.medications_detected ?? fields.length) !== 1
+                  ? "s"
+                  : ""}
+              </strong>{" "}
+              have been written to{" "}
+              <strong>{selectedPatient.name}</strong>&apos;s SehatKosh cloud record.
             </p>
           </div>
-          <Button onClick={() => { setStep(1); setSelectedPatient(null); setUploadedFile(null); setPatientQuery(""); setFields(DUMMY_EXTRACTED_FIELDS); }} id="ingest-another-btn">
+          <Button
+            onClick={() => {
+              setStep(1);
+              setSelectedPatient(null);
+              setUploadedFile(null);
+              setUploadedFileObj(null);
+              setPatientQuery("");
+              setFields(DUMMY_EXTRACTED_FIELDS);
+              setOcrResult(null);
+            }}
+            id="ingest-another-btn"
+          >
             Ingest Another Record
           </Button>
         </div>

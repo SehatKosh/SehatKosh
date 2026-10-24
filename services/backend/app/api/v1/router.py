@@ -2,6 +2,10 @@ from fastapi import APIRouter
 
 from app.api.v1.prescriptions import router as prescriptions_router
 from app.api.v1.telemetry import router as telemetry_router
+from app.api.v1.encounters import router as encounters_router
+from app.api.v1.patients import router as patients_router
+from app.api.v1.consent import router as consent_router
+from app.api.v1.audit import router as audit_router
 from app.core.config import settings
 from app.models.prescription import HealthResponse
 
@@ -10,6 +14,10 @@ router = APIRouter(prefix="/api/v1")
 # Mount sub-routers
 router.include_router(prescriptions_router)
 router.include_router(telemetry_router)
+router.include_router(encounters_router)
+router.include_router(patients_router)
+router.include_router(consent_router)
+router.include_router(audit_router)
 
 
 @router.get(

@@ -4,14 +4,16 @@ import React, { useState } from "react";
 import { ShieldOff, AlertTriangle, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import * as Dialog from "@radix-ui/react-dialog";
+import { submitBreakGlassOverride } from "@/lib/api-client";
 
 interface BreakGlassModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onGranted: () => void;
+  patientId?: string;
 }
 
-export function BreakGlassModal({ open, onOpenChange, onGranted }: BreakGlassModalProps) {
+export function BreakGlassModal({ open, onOpenChange, onGranted, patientId }: BreakGlassModalProps) {
   const [physician, setPhysician] = useState("");
   const [justification, setJustification] = useState("");
   const [witnessId, setWitnessId] = useState("");
@@ -26,11 +28,30 @@ export function BreakGlassModal({ open, onOpenChange, onGranted }: BreakGlassMod
     if (justification.trim().length < 20) { setError("Please provide a detailed clinical justification (min 20 chars)."); return; }
     if (!witnessId.trim()) { setError("Witness Staff ID is required."); return; }
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    setLoading(false);
-    setGranted(true);
-    // Auto-close after confirmation
-    setTimeout(() => { onGranted(); onOpenChange(false); setGranted(false); }, 2000);
+
+    try {
+      const overrideRes = await submitBreakGlassOverride({
+        patient_id: patientId || "00000000-0000-0000-0000-000000000001",
+        treating_physician_name: physician.trim(),
+        witness_staff_id: witnessId.trim(),
+        justification: justification.trim(),
+      });
+
+      if (overrideRes.token) {
+        document.cookie = `dossier_access_token=${overrideRes.token}; path=/; max-age=7200`;
+      }
+
+      setGranted(true);
+      setTimeout(() => {
+        onGranted();
+        onOpenChange(false);
+        setGranted(false);
+      }, 1500);
+    } catch (err: any) {
+      setError(err?.message || "Failed to execute break-glass override.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => {

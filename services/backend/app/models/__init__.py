@@ -4,6 +4,7 @@ from app.models.patient import PatientProfile
 from app.models.encounter import ClinicalEncounter
 from app.models.consent import ConsentGrant
 from app.models.audit import AuditLog
+from app.models.quorum import QuorumRequest, QuorumVote
 from app.models.prescription import (
     HealthResponse,
     Medication,
@@ -19,6 +20,8 @@ __all__ = [
     "ClinicalEncounter",
     "ConsentGrant",
     "AuditLog",
+    "QuorumRequest",
+    "QuorumVote",
     "HealthResponse",
     "Medication",
     "PrescriptionExtraction",

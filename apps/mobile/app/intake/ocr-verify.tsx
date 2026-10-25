@@ -15,9 +15,14 @@ import {
   X,
 } from "lucide-react-native";
 import { useRef, useState, useMemo, useCallback, useEffect } from "react";
-import { Alert, Image, Pressable, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { ExtractionResponse, MedicationRequest } from "@sehatkosh/types";
+import type { ExtractionResponse, FHIRBundle, MedicationRequest } from "@sehatkosh/types";
+import {
+  saveEncounter,
+  DEFAULT_PATIENT_ID,
+  type CreateEncounterPayload,
+} from "../../services/apiClient";
 
 // ─── Local editable medication type ──────────────────────────────────────────
 
@@ -147,6 +152,7 @@ export default function OcrVerifyScreen() {
   );
 
   const isSaveDisabled = hasContraindication && !acknowledged;
+  const [isSaving, setIsSaving] = useState(false);
 
   const expandForInput = () => sheetRef.current?.snapToIndex(1);
 
@@ -156,6 +162,106 @@ export default function OcrVerifyScreen() {
     );
 
   const topPadding = Math.max(insets.top, 16) + 8;
+
+  const handleSaveRecord = async () => {
+    if (isSaveDisabled || isSaving) return;
+    setIsSaving(true);
+
+    try {
+      const patientId = DEFAULT_PATIENT_ID;
+      const todayISO = new Date().toISOString().split("T")[0];
+
+      // Reconstruct finalized normative FHIR R4 Bundle from verified medications
+      const fhirEntries = [
+        {
+          fullUrl: `urn:uuid:patient-${patientId}`,
+          resource: {
+            resourceType: "Patient",
+            id: patientId,
+            name: [{ text: "Ali Raza", use: "official" }],
+          },
+        },
+        ...medications.map((med, index) => {
+          const medId = med.fhirId || `medrx-${Date.now()}-${index}`;
+          return {
+            fullUrl: `urn:uuid:${medId}`,
+            resource: {
+              resourceType: "MedicationRequest",
+              id: medId,
+              status: "active",
+              intent: "order",
+              medicationCodeableConcept: {
+                coding: med.isUnmapped
+                  ? []
+                  : [
+                      {
+                        system: "http://snomed.info/sct",
+                        code: "372687004",
+                        display: med.name,
+                      },
+                    ],
+                text: med.name,
+              },
+              subject: { reference: `urn:uuid:patient-${patientId}` },
+              authoredOn: todayISO,
+              dosageInstruction: [
+                {
+                  text: `${med.strength} — ${med.frequency} — ${med.duration}`,
+                },
+              ],
+            },
+          };
+        }),
+      ];
+
+      const finalizedBundle: FHIRBundle = {
+        resourceType: "Bundle",
+        id: `bundle-verified-${Date.now()}`,
+        type: "collection",
+        timestamp: new Date().toISOString(),
+        entry: fhirEntries as any,
+      };
+
+      const rawOcr = (extraction?.data?.raw_ocr ?? {}) as Record<string, unknown>;
+      const doctorName = (rawOcr.doctor_name as string) || "Dr. Tariq Khan";
+      const clinicName = (rawOcr.clinic as string) || "Shifa International Hospital";
+      const encDate = (rawOcr.date as string) || todayISO;
+
+      const payload: CreateEncounterPayload = {
+        patient_id: patientId,
+        physician_name: doctorName,
+        facility_name: clinicName,
+        encounter_date: encDate,
+        fhir_bundle: finalizedBundle,
+        soap_notes: {
+          subjective: "Patient presented with verified prescription slip.",
+          objective: `Verified ${medications.length} medications: ${medications.map((m) => `${m.name} ${m.strength}`).join(", ")}`,
+          assessment: "Prescription normalized to HL7 FHIR R4 standard.",
+          plan: medications.map((m) => `${m.name} ${m.strength} (${m.frequency} x ${m.duration})`).join("; "),
+        },
+        document_s3_key: `prescriptions/mobile_${Date.now()}.jpg`,
+      };
+
+      await saveEncounter(payload);
+
+      Alert.alert(
+        "Clinical Record Saved",
+        "The verified prescription has been normalized to FHIR and persisted to PostgreSQL.",
+        [
+          {
+            text: "View Records",
+            onPress: () => router.replace("/(tabs)/records"),
+          },
+        ]
+      );
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to persist encounter. Please try again.";
+      Alert.alert("Encounter Save Error", message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const renderFooter = useCallback(
     (props: BottomSheetFooterProps) => (
@@ -170,40 +276,38 @@ export default function OcrVerifyScreen() {
             </Text>
           )}
           <TouchableOpacity
-            disabled={isSaveDisabled}
-            onPress={() =>
-              Alert.alert(
-                "Saved",
-                "The verified medication list was added to your records.",
-                [
-                  {
-                    text: "OK",
-                    onPress: () => router.replace("/(tabs)/records"),
-                  },
-                ]
-              )
-            }
+            disabled={isSaveDisabled || isSaving}
+            onPress={handleSaveRecord}
             className={`w-full flex-row items-center justify-center rounded-xl py-4 ${
-              !isSaveDisabled ? "bg-sky-600 active:bg-sky-700" : "bg-slate-200"
+              !isSaveDisabled && !isSaving
+                ? "bg-sky-600 active:bg-sky-700"
+                : "bg-slate-200"
             }`}
           >
-            <CheckCircle2
-              color={!isSaveDisabled ? "#FFFFFF" : "#94A3B8"}
-              size={18}
-            />
+            {isSaving ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <CheckCircle2
+                color={!isSaveDisabled ? "#FFFFFF" : "#94A3B8"}
+                size={18}
+              />
+            )}
             <Text
               className={`ml-2 text-center text-sm font-bold ${
-                !isSaveDisabled ? "text-white" : "text-slate-400"
+                !isSaveDisabled && !isSaving ? "text-white" : "text-slate-400"
               }`}
             >
-              Save Clinical Record ({medications.length}{" "}
-              {medications.length === 1 ? "medication" : "medications"})
+              {isSaving
+                ? "Saving to Database..."
+                : `Confirm & Save Clinical Record (${medications.length} ${
+                    medications.length === 1 ? "medication" : "medications"
+                  })`}
             </Text>
           </TouchableOpacity>
         </View>
       </BottomSheetFooter>
     ),
-    [insets.bottom, isSaveDisabled, medications.length]
+    [insets.bottom, isSaveDisabled, isSaving, medications, handleSaveRecord]
   );
 
   return (

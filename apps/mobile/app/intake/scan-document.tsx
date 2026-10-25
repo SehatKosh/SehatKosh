@@ -25,9 +25,9 @@ import type { ExtractionResponse } from "@sehatkosh/types";
 
 // Processing state labels rendered in the extraction overlay
 const PROCESS_LABELS = [
-  "Scanning document geometry & contrast…",
-  "Extracting clinical text via Vision Pipeline…",
-  "Structuring FHIR MedicationRequest entities…",
+  "Uploading document buffer...",
+  "Extracting clinical text via Vision Pipeline...",
+  "Normalizing FHIR resources...",
 ];
 
 export default function ScanDocumentScreen() {
@@ -37,56 +37,64 @@ export default function ScanDocumentScreen() {
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [processState, setProcessState] = useState<number | null>(null);
-  const [extractionError, setExtractionError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
   /**
    * Full extraction flow for a captured or picked image URI:
-   * 1. Show processing overlay (3 animated steps)
-   * 2. Call extractPrescription() to hit the backend (or get mock data)
-   * 3. Navigate to ocr-verify, passing the FHIR bundle & imageUri via params
+   * 1. Show progressive processing overlay ("Uploading buffer" -> "Extracting text" -> "Normalizing FHIR")
+   * 2. Call extractPrescription() to hit backend POST /api/v1/prescriptions/extract
+   * 3. On success: navigate to ocr-verify with parsed ExtractionResponse
+   * 4. On failure: alert user with clean message and allow retaking
    */
   const runExtraction = async (uri: string) => {
-    setExtractionError(null);
     setProcessState(0);
 
-    // Advance overlay through visual steps in parallel with real API call
-    const step1Timer = setTimeout(() => setProcessState(1), 700);
-    const step2Timer = setTimeout(() => setProcessState(2), 1500);
+    // Advance overlay through progressive states
+    const step1Timer = setTimeout(() => setProcessState(1), 800);
+    const step2Timer = setTimeout(() => setProcessState(2), 1800);
 
-    let extraction: ExtractionResponse | null = null;
     try {
-      extraction = await extractPrescription(uri);
+      const extraction = await extractPrescription(uri);
+
+      clearTimeout(step1Timer);
+      clearTimeout(step2Timer);
+
+      // Brief pause on final step for visual feedback
+      setProcessState(2);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      setProcessState(null);
+      setIsCapturing(false);
+
+      const extractionParam = JSON.stringify(extraction);
+
+      router.replace({
+        pathname: "/intake/ocr-verify",
+        params: {
+          imageUri: uri,
+          extraction: extractionParam,
+        },
+      });
     } catch (err: unknown) {
+      clearTimeout(step1Timer);
+      clearTimeout(step2Timer);
+      setProcessState(null);
+      setIsCapturing(false);
+
       const message =
-        err instanceof Error ? err.message : "Unknown extraction error";
+        err instanceof Error ? err.message : "Document processing failed. Please check your connection.";
       console.warn("[scan-document] extractPrescription failed:", message);
-      setExtractionError(message);
-      // Still navigate to verify screen; it will render with empty state
+
+      Alert.alert(
+        "Prescription Ingestion Error",
+        message,
+        [
+          {
+            text: "Retake Photo",
+            style: "default",
+          },
+        ]
+      );
     }
-
-    clearTimeout(step1Timer);
-    clearTimeout(step2Timer);
-
-    // Ensure overlay shows the final "FHIR" step for at least 400ms
-    setProcessState(2);
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    setProcessState(null);
-    setIsCapturing(false);
-
-    // Serialise the extraction result to pass as route param.
-    // expo-router params must be strings; the verify screen deserialises.
-    const extractionParam = extraction
-      ? JSON.stringify(extraction)
-      : undefined;
-
-    router.replace({
-      pathname: "/intake/ocr-verify",
-      params: {
-        imageUri: uri,
-        ...(extractionParam ? { extraction: extractionParam } : {}),
-      },
-    });
   };
 
   const capture = async () => {
@@ -181,12 +189,6 @@ export default function ScanDocumentScreen() {
             <Text className="mt-8 text-center text-base font-medium text-white">
               {PROCESS_LABELS[processState]}
             </Text>
-
-            {extractionError && (
-              <Text className="mt-3 text-center text-xs text-amber-400">
-                ⚠ Falling back to demo data
-              </Text>
-            )}
           </View>
         </View>
       )}

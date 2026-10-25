@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Plus,
   Search,
@@ -11,6 +11,7 @@ import {
   Clock,
 } from "lucide-react-native";
 import {
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -20,7 +21,15 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import BottomSheet from "@gorhom/bottom-sheet";
-import { MOCK_RECORDS, groupByMonth, type ClinicalEncounter } from "../../services/mockRecords";
+import {
+  MOCK_RECORDS,
+  groupByMonth,
+  type ClinicalEncounter,
+} from "../../services/mockRecords";
+import {
+  getPatientEncounters,
+  DEFAULT_PATIENT_ID,
+} from "../../services/apiClient";
 import { AllergyModal, type Allergy } from "../../components/AllergyModal";
 
 // ── Specialty badge colors ─────────────────────────────────────────────────
@@ -133,7 +142,44 @@ export default function RecordsScreen() {
   const [search, setSearch] = useState("");
   const allergyModalRef = useRef<BottomSheet>(null);
 
+  const [encounters, setEncounters] = useState<ClinicalEncounter[]>(MOCK_RECORDS);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLiveSync, setIsLiveSync] = useState(false);
+
   const topPadding = Math.max(insets.top, 16) + 8;
+
+  const loadEncounters = useCallback(async (isPull = false) => {
+    if (isPull) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+
+    try {
+      const patientId = DEFAULT_PATIENT_ID;
+      const liveList = await getPatientEncounters(patientId);
+      if (liveList && liveList.length > 0) {
+        // Merge live encounters with mock records, giving precedence to live records
+        const liveIds = new Set(liveList.map((e) => e.id));
+        const merged = [...liveList, ...MOCK_RECORDS.filter((m) => !liveIds.has(m.id))];
+        setEncounters(merged);
+        setIsLiveSync(true);
+      } else {
+        setEncounters(MOCK_RECORDS);
+      }
+    } catch (err: unknown) {
+      console.warn("[records] Live encounter query failed, using baseline records:", err);
+      setEncounters(MOCK_RECORDS);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadEncounters();
+  }, [loadEncounters]);
 
   // Allergy state — initialised with existing profile allergies
   const [allergies, setAllergies] = useState<(Allergy & { id: string })[]>([
@@ -148,18 +194,18 @@ export default function RecordsScreen() {
     ]);
   };
 
-  const groupedRecords = groupByMonth(MOCK_RECORDS);
+  const groupedRecords = groupByMonth(encounters);
 
   const filteredGroups = search.trim()
-    ? groupedRecords.map(({ month, encounters }) => ({
+    ? groupedRecords.map(({ month, encounters: groupEncounters }) => ({
         month,
-        encounters: encounters.filter(
+        encounters: groupEncounters.filter(
           (e) =>
             e.doctor.toLowerCase().includes(search.toLowerCase()) ||
             e.specialty.toLowerCase().includes(search.toLowerCase()) ||
             e.facility.toLowerCase().includes(search.toLowerCase())
         ),
-      })).filter(({ encounters }) => encounters.length > 0)
+      })).filter(({ encounters: groupEncounters }) => groupEncounters.length > 0)
     : groupedRecords;
 
   const allergyChipStyle: Record<Allergy["severity"], string> = {
@@ -184,12 +230,28 @@ export default function RecordsScreen() {
         }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={() => loadEncounters(true)}
+            tintColor="#0284C7"
+            colors={["#0284C7"]}
+          />
+        }
       >
         {/* ── Page Header ─────────────────────────────────── */}
         <Text className="text-3xl font-bold text-slate-900">Records</Text>
-        <Text className="mt-1 text-sm text-slate-500">
-          Your clinical history and health profile
-        </Text>
+        <View className="mt-1 flex-row items-center justify-between">
+          <Text className="text-sm text-slate-500">
+            Your clinical history and health profile
+          </Text>
+          {isLiveSync && (
+            <View className="flex-row items-center rounded-full bg-emerald-50 px-2 py-0.5 border border-emerald-200">
+              <View className="mr-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <Text className="text-[10px] font-bold text-emerald-700">Live PostgreSQL</Text>
+            </View>
+          )}
+        </View>
 
         {/* ── Segment Control ──────────────────────────────── */}
         <View className="mt-6 flex-row rounded-xl bg-slate-200 p-1">
@@ -232,19 +294,35 @@ export default function RecordsScreen() {
               />
             </View>
 
+            {/* Zero-flicker loading skeleton */}
+            {isLoading && !isRefreshing && (
+              <View className="mt-5 gap-3">
+                <View className="h-28 rounded-2xl border border-slate-200 bg-white p-4 opacity-70">
+                  <View className="h-4 w-1/3 rounded bg-slate-200" />
+                  <View className="mt-2 h-3 w-1/2 rounded bg-slate-100" />
+                  <View className="mt-4 h-3 w-full rounded bg-slate-100" />
+                </View>
+                <View className="h-28 rounded-2xl border border-slate-200 bg-white p-4 opacity-40">
+                  <View className="h-4 w-1/4 rounded bg-slate-200" />
+                  <View className="mt-2 h-3 w-2/5 rounded bg-slate-100" />
+                  <View className="mt-4 h-3 w-full rounded bg-slate-100" />
+                </View>
+              </View>
+            )}
+
             {/* Encounter groups */}
-            {filteredGroups.map(({ month, encounters }) => (
+            {filteredGroups.map(({ month, encounters: groupList }) => (
               <View key={month}>
                 <Text className="mb-3 mt-6 text-lg font-bold text-slate-900">
                   {month}
                 </Text>
-                {encounters.map((encounter) => (
+                {groupList.map((encounter) => (
                   <EncounterCard key={encounter.id} encounter={encounter} />
                 ))}
               </View>
             ))}
 
-            {filteredGroups.length === 0 && (
+            {!isLoading && filteredGroups.length === 0 && (
               <View className="mt-12 items-center">
                 <ShieldCheck size={32} color="#CBD5E1" />
                 <Text className="mt-3 text-center text-sm text-slate-400">

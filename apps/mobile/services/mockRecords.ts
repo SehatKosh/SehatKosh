@@ -180,9 +180,23 @@ export const MOCK_RECORDS: ClinicalEncounter[] = [
   },
 ];
 
-/** Look up a single encounter by ID. Returns undefined if not found. */
+// ─── Live Records Cache ────────────────────────────────────────────────────────
+const LIVE_RECORDS_CACHE = new Map<string, ClinicalEncounter>();
+
+/** Register live encounters fetched or created via API for immediate navigation */
+export function registerLiveEncounter(encounter: ClinicalEncounter): void {
+  LIVE_RECORDS_CACHE.set(encounter.id, encounter);
+}
+
+export function registerLiveEncounters(encounters: ClinicalEncounter[]): void {
+  for (const encounter of encounters) {
+    LIVE_RECORDS_CACHE.set(encounter.id, encounter);
+  }
+}
+
+/** Look up a single encounter by ID. Checks live registry first, then mock records. */
 export function getEncounterById(id: string): ClinicalEncounter | undefined {
-  return MOCK_RECORDS.find((record) => record.id === id);
+  return LIVE_RECORDS_CACHE.get(id) ?? MOCK_RECORDS.find((record) => record.id === id);
 }
 
 /** Group encounters by month label (e.g. "August 2026") */

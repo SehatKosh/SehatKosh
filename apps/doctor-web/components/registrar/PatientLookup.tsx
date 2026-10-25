@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { Search, User, Phone, AlertCircle, X, CheckCircle2, Clock } from "lucide-react";
+import { Search, User, Phone, AlertCircle, X, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { MOCK_PATIENTS, getOnDutyDoctors, type Patient } from "@/lib/mockData";
+import { searchPatientByCnic } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 
 interface PatientLookupProps {
@@ -28,22 +29,23 @@ function maskPhone(phone: string) {
   return phone.slice(0, 4) + "-***" + phone.slice(-4);
 }
 
-function findPatient(query: string): Patient | null {
-  const q = query.toLowerCase().trim();
-  return (
-    MOCK_PATIENTS.find(
-      (p) =>
-        p.medicalId.toLowerCase() === q ||
-        (p.phone ?? "").replace(/\s/g, "").includes(q.replace(/\D/g, "")) ||
-        (p.name ?? "").toLowerCase().includes(q)
-    ) ?? null
-  );
+function formatCnicMaskInput(value: string): string {
+  // If user is typing digits or dashed format
+  const clean = value.replace(/[^\d-]/g, "");
+  if (!clean.includes("-") && clean.length > 5) {
+    if (clean.length <= 12) {
+      return `${clean.slice(0, 5)}-${clean.slice(5)}`;
+    }
+    return `${clean.slice(0, 5)}-${clean.slice(5, 12)}-${clean.slice(12, 13)}`;
+  }
+  return value;
 }
 
 export function PatientLookup({ onDispatch, onNewPatient }: PatientLookupProps) {
   const [query, setQuery] = useState("");
   const [result, setResult] = useState<Patient | null>(null);
   const [notFound, setNotFound] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [selectedDoctor, setSelectedDoctor] = useState("");
   const [selectedRoom, setSelectedRoom] = useState("");
   const [duration, setDuration] = useState("4h");
@@ -51,19 +53,61 @@ export function PatientLookup({ onDispatch, onNewPatient }: PatientLookupProps) 
 
   const onDutyDoctors = getOnDutyDoctors();
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    const found = findPatient(query);
-    if (found) {
-      setResult(found);
-      setNotFound(false);
-      if (onDutyDoctors[0]) {
-        setSelectedDoctor(onDutyDoctors[0].id);
-        setSelectedRoom(onDutyDoctors[0].roomNumber ?? "");
+    if (!query.trim()) return;
+    setLoading(true);
+    setNotFound(false);
+
+    try {
+      const data = await searchPatientByCnic(query.trim());
+      if (data) {
+        const initials =
+          data.name
+            .split(" ")
+            .map((n) => n[0])
+            .slice(0, 2)
+            .join("")
+            .toUpperCase() || "PT";
+
+        const mappedPatient: Patient = {
+          id: data.id,
+          name: data.name,
+          initials,
+          age: data.age,
+          gender: data.gender === "Female" ? "Female" : "Male",
+          bloodGroup: data.blood_group,
+          medicalId: data.mrn,
+          phone: data.phone_masked,
+          allergies: [],
+          chronicConditions: [],
+          lastEncounterDate: new Date().toISOString().split("T")[0],
+          lastEncounterReason: "Consultation Request",
+          activeDrugCount: 0,
+          hasContraindication: false,
+          accessStatus: "active",
+          accessExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          vitalsStatus: "normal",
+          lastHR: 75,
+          lastSpO2: 98,
+        };
+
+        setResult(mappedPatient);
+        setNotFound(false);
+        if (onDutyDoctors[0]) {
+          setSelectedDoctor(onDutyDoctors[0].id);
+          setSelectedRoom(onDutyDoctors[0].roomNumber ?? "");
+        }
+      } else {
+        setResult(null);
+        setNotFound(true);
       }
-    } else {
+    } catch (err) {
+      console.warn("Patient lookup failed:", err);
       setResult(null);
       setNotFound(true);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -97,8 +141,11 @@ export function PatientLookup({ onDispatch, onNewPatient }: PatientLookupProps) 
             autoFocus
             type="text"
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setNotFound(false); }}
-            placeholder="Search by CNIC, Phone (03xx-xxxxxxx), or MRN (SK-XXXX-X)..."
+            onChange={(e) => {
+              setQuery(formatCnicMaskInput(e.target.value));
+              setNotFound(false);
+            }}
+            placeholder="Search by CNIC (XXXXX-XXXXXXX-X), Phone, or MRN..."
             className="w-full pl-9 pr-9 py-2.5 text-sm border border-border rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-primary/30 font-clinical"
           />
           {query && (
@@ -107,7 +154,10 @@ export function PatientLookup({ onDispatch, onNewPatient }: PatientLookupProps) 
             </button>
           )}
         </div>
-        <Button type="submit" id="lookup-search-btn">Search</Button>
+        <Button type="submit" id="lookup-search-btn" disabled={loading} className="gap-2">
+          {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+          Search
+        </Button>
       </form>
 
       {/* Format hint */}

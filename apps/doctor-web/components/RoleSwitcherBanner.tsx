@@ -89,6 +89,10 @@ export function RoleSwitcherBanner() {
               key={role.key}
               href={role.route}
               id={`role-switch-${role.key}`}
+              onClick={() => {
+                const cookieRole = role.key === "help-desk" ? "registrar" : role.key;
+                document.cookie = `sehatkosh_role=${cookieRole}; path=/; max-age=86400`;
+              }}
               className={cn(
                 "flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold transition-all duration-200 border",
                 isActive

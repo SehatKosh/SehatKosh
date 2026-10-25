@@ -25,12 +25,14 @@ import type {
 import {
   MOCK_PATIENTS,
   MOCK_AUDIT_LOGS,
+  MOCK_QUEUE_ITEMS,
   getPatientById,
   getEncountersByPatientId,
+  type QueueItem,
 } from "./mockData";
 
 // Re-export for consumers that used to import from here
-export type { ExtractionResponse, ExtractionMetadata, FHIRBundle };
+export type { ExtractionResponse, ExtractionMetadata, FHIRBundle, QueueItem };
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -624,3 +626,55 @@ export async function fetchAuditLogs(): Promise<AuditLogEntry[]> {
     }));
   }
 }
+
+/**
+ * Fetch active consultation queue for a doctor from FastAPI backend.
+ */
+export async function fetchDoctorQueue(
+  physicianId: string = "11111111-1111-1111-1111-111111111111"
+): Promise<QueueItem[]> {
+  if (USE_MOCK_ENV) {
+    return MOCK_QUEUE_ITEMS;
+  }
+
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/api/v1/queue/active?physician_id=${physicianId}`,
+      {
+        cache: "no-store",
+      }
+    );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data.map((item: any, index: number) => {
+      const granted = new Date(item.consent_granted_at).getTime();
+      const waitMinutes = Math.max(
+        0,
+        Math.floor((Date.now() - granted) / 60000)
+      );
+      return {
+        id: item.consent_id || item.id,
+        queueNumber: index + 1,
+        patientId: item.id,
+        patientName: item.patient_name,
+        patientMrn: item.mrn,
+        chiefComplaint: item.is_break_glass
+          ? "Emergency Trauma Assessment (Break-Glass)"
+          : "Clinical Consultation",
+        waitMinutes: waitMinutes,
+        consentExpiresAt: item.consent_expires_at,
+        status: (item.status === "in_consultation" || item.status === "completed"
+          ? item.status
+          : "waiting") as "waiting" | "in_consultation" | "completed",
+        is_break_glass: Boolean(item.is_break_glass),
+      };
+    });
+  } catch (err) {
+    console.warn(
+      "[SehatKosh API] fetchDoctorQueue error, falling back to mock:",
+      err
+    );
+    return MOCK_QUEUE_ITEMS;
+  }
+}
+

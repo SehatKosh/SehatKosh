@@ -83,12 +83,13 @@ async def create_encounter(
 async def get_encounter(
     encounter_id: UUID,
     physician_id: Optional[UUID] = Query(None),
+    x_patient_id: Optional[UUID] = Header(None, alias="X-Patient-Id"),
     x_physician_id: Optional[UUID] = Header(None, alias="X-Physician-Id"),
     db: AsyncSession = Depends(get_db),
 ) -> EncounterRead:
     """
     Retrieves clinical encounter by UUID.
-    Guards access with active consent validation (BOLA / IDOR protection).
+    Guards access with active consent validation or record ownership (BOLA / IDOR protection).
     """
     stmt = select(ClinicalEncounter).where(ClinicalEncounter.id == encounter_id)
     result = await db.execute(stmt)
@@ -99,10 +100,11 @@ async def get_encounter(
             detail="Clinical encounter not found",
         )
 
-    # Validate active consent session
+    # Validate active consent session or patient ownership
     await require_active_consent(
         patient_id=encounter.patient_id,
         physician_id=physician_id,
+        x_patient_id=x_patient_id,
         db=db,
         x_physician_id=x_physician_id,
     )
@@ -117,12 +119,12 @@ async def get_encounter(
 )
 async def list_patient_encounters(
     patient_id: UUID,
-    consent: ConsentGrant = Depends(require_active_consent),
+    consent: Optional[ConsentGrant] = Depends(require_active_consent),
     db: AsyncSession = Depends(get_db),
 ) -> List[EncounterRead]:
     """
     Lists clinical encounters for a patient.
-    Requires active consent grant for the requesting physician (BOLA / IDOR protection).
+    Requires active consent grant for physician or patient record ownership (BOLA / IDOR protection).
     """
     stmt = (
         select(ClinicalEncounter)

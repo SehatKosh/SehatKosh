@@ -5,6 +5,7 @@ from app.schemas.consent import (
     BreakGlassRequest,
     ConsentGrantRead,
 )
+from app.schemas.queue import QueueItemResponse
 
 __all__ = [
     "EncounterCreate",
@@ -13,4 +14,5 @@ __all__ = [
     "ConsentCheckResponse",
     "BreakGlassRequest",
     "ConsentGrantRead",
+    "QueueItemResponse",
 ]

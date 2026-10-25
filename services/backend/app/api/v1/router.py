@@ -6,6 +6,9 @@ from app.api.v1.encounters import router as encounters_router
 from app.api.v1.patients import router as patients_router
 from app.api.v1.consent import router as consent_router
 from app.api.v1.audit import router as audit_router
+from app.api.v1.queue import router as queue_router
+from app.api.v1.research import router as research_router
+from app.api.v1.quorum import router as quorum_router
 from app.core.config import settings
 from app.models.prescription import HealthResponse
 
@@ -18,9 +21,13 @@ router.include_router(encounters_router)
 router.include_router(patients_router)
 router.include_router(consent_router)
 router.include_router(audit_router)
+router.include_router(queue_router)
+router.include_router(research_router)
+router.include_router(quorum_router)
 
 
 @router.get(
+
     "/health",
     response_model=HealthResponse,
     tags=["Health"],

@@ -487,6 +487,7 @@ export interface QueueItem {
   waitMinutes: number;
   consentExpiresAt: string;
   status: "waiting" | "in_consultation" | "completed";
+  is_break_glass?: boolean;
 }
 
 export interface HospitalStaff {

@@ -39,7 +39,14 @@ async def require_active_consent(
     result = await db.execute(stmt)
     grant = result.scalars().first()
 
-    if not grant or grant.status != "active":
+    if not grant:
+        await log_audit_event(
+            db=db,
+            actor_id=str(effective_physician_id),
+            action_type="UNAUTHORIZED_ACCESS_ATTEMPT",
+            patient_id=str(patient_id),
+            severity="WARNING",
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="No active consent session found",
@@ -50,12 +57,33 @@ async def require_active_consent(
     if expires.tzinfo is None:
         expires = expires.replace(tzinfo=timezone.utc)
 
-    if expires < now and grant.is_break_glass is False:
-        grant.status = "expired"
-        await db.commit()
+    if (expires < now or grant.status == "expired") and grant.is_break_glass is False:
+        if grant.status != "expired":
+            grant.status = "expired"
+            await db.commit()
+        await log_audit_event(
+            db=db,
+            actor_id=str(effective_physician_id),
+            action_type="CONSENT_EXPIRED_ACCESS_ATTEMPT",
+            patient_id=str(patient_id),
+            severity="WARNING",
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Consent session expired. Re-authorization required.",
+        )
+
+    if grant.status != "active":
+        await log_audit_event(
+            db=db,
+            actor_id=str(effective_physician_id),
+            action_type="UNAUTHORIZED_ACCESS_ATTEMPT",
+            patient_id=str(patient_id),
+            severity="WARNING",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No active consent session found",
         )
 
     return grant

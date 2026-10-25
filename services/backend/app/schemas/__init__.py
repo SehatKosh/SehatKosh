@@ -5,6 +5,14 @@ from app.schemas.consent import (
     BreakGlassRequest,
     ConsentGrantRead,
 )
+from app.schemas.queue import QueueItemResponse
+from app.schemas.research import CohortFilterRequest, DeidentifiedRecordResponse
+from app.schemas.quorum import (
+    QuorumCreate,
+    QuorumVoteRequest,
+    QuorumVoteResponse,
+    QuorumResponse,
+)
 
 __all__ = [
     "EncounterCreate",
@@ -13,4 +21,12 @@ __all__ = [
     "ConsentCheckResponse",
     "BreakGlassRequest",
     "ConsentGrantRead",
+    "QueueItemResponse",
+    "CohortFilterRequest",
+    "DeidentifiedRecordResponse",
+    "QuorumCreate",
+    "QuorumVoteRequest",
+    "QuorumVoteResponse",
+    "QuorumResponse",
 ]
+

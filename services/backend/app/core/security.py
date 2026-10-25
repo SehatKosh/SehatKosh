@@ -14,13 +14,20 @@ from app.models.consent import ConsentGrant
 async def require_active_consent(
     patient_id: UUID,
     physician_id: Optional[UUID] = Query(None),
+    x_patient_id: Optional[UUID] = Header(None, alias="X-Patient-Id"),
     db: AsyncSession = Depends(get_db),
     x_physician_id: Optional[UUID] = Header(None, alias="X-Physician-Id"),
-) -> ConsentGrant:
+) -> Optional[ConsentGrant]:
     """
-    Enforces active 24-hour consent or active emergency break-glass grant.
+    Enforces active 24-hour consent or patient record ownership (BOLA / IDOR protection).
+    - If X-Patient-Id matches the requested patient_id, access is granted to the record owner.
+    - Otherwise, requires active 24-hour consent or active emergency break-glass grant for physician.
     Raises 403 Forbidden if consent is missing, inactive, or expired.
     """
+    # 1. Patient Record Ownership (Self-Access)
+    if x_patient_id and x_patient_id == patient_id:
+        return None
+
     effective_physician_id = physician_id or x_physician_id
     if not effective_physician_id:
         raise HTTPException(

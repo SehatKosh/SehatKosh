@@ -56,7 +56,7 @@ export default function DoctorDossierPage({ params }: PageProps) {
 
   const { patient, encounters, interactions } = dossier;
   const selectedEncounter = encounters.find((e) => e.id === selectedEncounterId) ?? encounters[0];
-  const isLockedOut = consentSession.isExpired || patient.accessStatus === "expired";
+  const isLockedOut = Boolean(dossier.locked || consentSession.isExpired || patient.accessStatus === "expired");
 
   return (
     <div className="flex flex-col h-screen overflow-hidden relative bg-slate-50">

@@ -9,6 +9,9 @@ pydantic-settings>=2.4.0
 # Database (async)
 sqlalchemy>=2.0.32
 asyncpg>=0.29.0
+alembic>=1.13.0
+aiosqlite>=0.20.0
+greenlet>=3.0.0
 
 # Graph database
 neo4j>=5.23.1

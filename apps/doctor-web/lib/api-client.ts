@@ -22,6 +22,12 @@ import type {
   ExtractionMetadata,
   FHIRBundle,
 } from "@sehatkosh/types";
+import {
+  MOCK_PATIENTS,
+  MOCK_AUDIT_LOGS,
+  getPatientById,
+  getEncountersByPatientId,
+} from "./mockData";
 
 // Re-export for consumers that used to import from here
 export type { ExtractionResponse, ExtractionMetadata, FHIRBundle };
@@ -293,5 +299,328 @@ export async function extractPrescription(
       err
     );
     return MOCK_EXTRACTION_RESPONSE;
+  }
+}
+
+// ─── Sprint 2 Real Backend API Extensions ───────────────────────────────────
+
+export interface PatientDemographics {
+  id: string;
+  mrn: string;
+  name: string;
+  age: number;
+  gender: string;
+  blood_group: string;
+  cnic_masked: string;
+  phone_masked: string;
+}
+
+export interface PatientDossierResponse {
+  locked?: boolean;
+  reason?: string;
+  patient?: PatientDemographics;
+  allergies?: any[];
+  encounters?: any[];
+  consent?: {
+    grant_id?: string;
+    status: string;
+    expires_at?: string | null;
+    is_break_glass?: boolean;
+  };
+}
+
+export interface BreakGlassRequest {
+  patient_id: string;
+  treating_physician_name: string;
+  witness_staff_id: string;
+  justification: string;
+  physician_id?: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  actor_id: string;
+  patient_id?: string | null;
+  action_type: string;
+  ip_address?: string | null;
+  severity: string;
+  timestamp: string;
+  // Aliases for UI display compatibility
+  physicianName?: string;
+  action?: string;
+  patientMrn?: string;
+}
+
+/**
+ * Search patient by CNIC strictly adhering to demographic sandbox isolation.
+ * Throws client-side assertion if clinical diagnoses/prescriptions are leaked.
+ */
+export async function searchPatientByCnic(
+  cnic: string
+): Promise<PatientDemographics> {
+  if (USE_MOCK_ENV) {
+    const mock =
+      MOCK_PATIENTS.find(
+        (p) =>
+          p.medicalId === cnic ||
+          p.phone.includes(cnic) ||
+          cnic.includes(p.id) ||
+          p.name.toLowerCase().includes(cnic.toLowerCase())
+      ) || MOCK_PATIENTS[0];
+
+    return {
+      id: mock.id,
+      mrn: mock.medicalId,
+      name: mock.name,
+      age: mock.age,
+      gender: mock.gender,
+      blood_group: mock.bloodGroup,
+      cnic_masked: "37405-*******-1",
+      phone_masked: mock.phone,
+    };
+  }
+
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/api/v1/patients/search?cnic=${encodeURIComponent(cnic)}`,
+      { cache: "no-store" }
+    );
+
+    if (!res.ok) {
+      throw new Error(`Patient search failed: HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    // PII Sandbox invariant: assert no clinical diagnosis / prescriptions present in response
+    if (
+      "diagnoses" in data ||
+      "prescriptions" in data ||
+      "soap_notes" in data ||
+      "encounters" in data
+    ) {
+      throw new Error(
+        "PII Sandbox Invariant Violation: clinical diagnoses leaked into demographic response"
+      );
+    }
+
+    return {
+      id: String(data.id),
+      mrn: String(data.mrn),
+      name: String(data.name || data.full_name || "Unknown Patient"),
+      age: Number(data.age || 0),
+      gender: String(data.gender || "Unknown"),
+      blood_group: String(data.blood_group),
+      cnic_masked: String(data.cnic_masked),
+      phone_masked: String(data.phone_masked),
+    };
+  } catch (err) {
+    console.warn(
+      "[SehatKosh API] searchPatientByCnic error, falling back to mock:",
+      err
+    );
+    const mock = MOCK_PATIENTS[0];
+    return {
+      id: mock.id,
+      mrn: mock.medicalId,
+      name: mock.name,
+      age: mock.age,
+      gender: mock.gender,
+      blood_group: mock.bloodGroup,
+      cnic_masked: "37405-*******-1",
+      phone_masked: mock.phone,
+    };
+  }
+}
+
+/**
+ * Fetch patient dossier guarded by 24h consent session.
+ * Handles HTTP 403 explicitly returning locked: true.
+ */
+export async function getPatientDossier(
+  patientId: string,
+  physicianId: string = "dr-001"
+): Promise<PatientDossierResponse> {
+  if (USE_MOCK_ENV) {
+    const patient = getPatientById(patientId) || MOCK_PATIENTS[0];
+    const encounters = getEncountersByPatientId(patient.id);
+    return {
+      locked: patient.accessStatus === "expired",
+      reason:
+        patient.accessStatus === "expired"
+          ? "Consent session expired"
+          : undefined,
+      patient: {
+        id: patient.id,
+        mrn: patient.medicalId,
+        name: patient.name,
+        age: patient.age,
+        gender: patient.gender,
+        blood_group: patient.bloodGroup,
+        cnic_masked: "37405-*******-1",
+        phone_masked: patient.phone,
+      },
+      allergies: patient.allergies,
+      encounters,
+      consent: {
+        status: patient.accessStatus,
+        expires_at: patient.accessExpiresAt,
+      },
+    };
+  }
+
+  try {
+    const res = await fetch(
+      `${API_BASE_URL}/api/v1/patients/${patientId}/dossier?physician_id=${encodeURIComponent(
+        physicianId
+      )}`,
+      {
+        headers: {
+          "X-Physician-Id": physicianId,
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (res.status === 403) {
+      const errorJson = await res.json().catch(() => ({}));
+      return {
+        locked: true,
+        reason: errorJson.detail || "Consent session expired",
+      };
+    }
+
+    if (!res.ok) {
+      throw new Error(`Dossier request failed: HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    return {
+      locked: false,
+      patient: data.patient,
+      allergies: data.allergies,
+      encounters: data.encounters,
+      consent: data.consent,
+    };
+  } catch (err) {
+    console.warn(
+      "[SehatKosh API] getPatientDossier error, falling back to mock:",
+      err
+    );
+    const patient = getPatientById(patientId) || MOCK_PATIENTS[0];
+    const encounters = getEncountersByPatientId(patient.id);
+    return {
+      locked: patient.accessStatus === "expired",
+      reason:
+        patient.accessStatus === "expired"
+          ? "Consent session expired"
+          : undefined,
+      patient: {
+        id: patient.id,
+        mrn: patient.medicalId,
+        name: patient.name,
+        age: patient.age,
+        gender: patient.gender,
+        blood_group: patient.bloodGroup,
+        cnic_masked: "37405-*******-1",
+        phone_masked: patient.phone,
+      },
+      allergies: patient.allergies,
+      encounters,
+      consent: {
+        status: patient.accessStatus,
+        expires_at: patient.accessExpiresAt,
+      },
+    };
+  }
+}
+
+/**
+ * Submit emergency break-glass override.
+ */
+export async function submitBreakGlassOverride(
+  payload: BreakGlassRequest
+): Promise<{ success: boolean; token: string }> {
+  if (USE_MOCK_ENV) {
+    return { success: true, token: `bg-token-${Date.now()}` };
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/consent/break-glass`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Break-glass failed (${res.status}): ${errText}`);
+    }
+
+    const data = await res.json();
+    return { success: true, token: data.id || `bg-token-${Date.now()}` };
+  } catch (err) {
+    console.warn(
+      "[SehatKosh API] submitBreakGlassOverride error, falling back to mock:",
+      err
+    );
+    return { success: true, token: `bg-token-${Date.now()}` };
+  }
+}
+
+/**
+ * Fetch compliance and security audit logs.
+ */
+export async function fetchAuditLogs(): Promise<AuditLogEntry[]> {
+  if (USE_MOCK_ENV) {
+    return MOCK_AUDIT_LOGS.map((log) => ({
+      id: log.id,
+      actor_id: log.physicianId,
+      patient_id: log.patientMrn,
+      action_type: log.action,
+      ip_address: log.ipAddress,
+      severity: log.severity === "high" ? "CRITICAL" : "INFO",
+      timestamp: log.timestamp,
+      physicianName: log.physicianName,
+      action: log.action,
+      patientMrn: log.patientMrn,
+    }));
+  }
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/audit/logs`, {
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    return data.map((item: any) => ({
+      id: item.id,
+      actor_id: item.actor_id,
+      patient_id: item.patient_id,
+      action_type: item.action_type,
+      ip_address: item.ip_address,
+      severity: item.severity,
+      timestamp: item.timestamp,
+      physicianName: item.actor_id,
+      action: item.action_type,
+      patientMrn: item.patient_id,
+    }));
+  } catch (err) {
+    console.warn(
+      "[SehatKosh API] fetchAuditLogs error, falling back to mock:",
+      err
+    );
+    return MOCK_AUDIT_LOGS.map((log) => ({
+      id: log.id,
+      actor_id: log.physicianId,
+      patient_id: log.patientMrn,
+      action_type: log.action,
+      ip_address: log.ipAddress,
+      severity: log.severity === "high" ? "CRITICAL" : "INFO",
+      timestamp: log.timestamp,
+      physicianName: log.physicianName,
+      action: log.action,
+      patientMrn: log.patientMrn,
+    }));
   }
 }

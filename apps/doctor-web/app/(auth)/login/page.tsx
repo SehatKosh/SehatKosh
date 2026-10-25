@@ -103,6 +103,8 @@ export default function LoginPage() {
     if (mfaCode.length !== 6) { setError("Enter the 6-digit code."); return; }
     setLoading(true);
     await new Promise((r) => setTimeout(r, 600));
+    const roleVal = selectedRole?.role === "admin" ? "super-admin" : (selectedRole?.role || "doctor");
+    document.cookie = `sehatkosh_role=${roleVal}; path=/; max-age=86400`;
     setLoading(false);
     router.push(selectedRole!.homeRoute);
   };

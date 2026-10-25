@@ -9,6 +9,7 @@ from app.api.v1.audit import router as audit_router
 from app.api.v1.queue import router as queue_router
 from app.api.v1.research import router as research_router
 from app.api.v1.quorum import router as quorum_router
+from app.api.v1.chat import router as chat_router
 from app.core.config import settings
 from app.models.prescription import HealthResponse
 
@@ -24,6 +25,7 @@ router.include_router(audit_router)
 router.include_router(queue_router)
 router.include_router(research_router)
 router.include_router(quorum_router)
+router.include_router(chat_router)
 
 
 @router.get(

@@ -1,12 +1,13 @@
-from typing import List
+from typing import List, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import log_audit_event
+from app.core.security import log_audit_event, require_active_consent
+from app.models.consent import ConsentGrant
 from app.models.encounter import ClinicalEncounter
 from app.models.patient import PatientProfile
 from app.schemas.encounter import EncounterCreate, EncounterRead
@@ -81,8 +82,14 @@ async def create_encounter(
 )
 async def get_encounter(
     encounter_id: UUID,
+    physician_id: Optional[UUID] = Query(None),
+    x_physician_id: Optional[UUID] = Header(None, alias="X-Physician-Id"),
     db: AsyncSession = Depends(get_db),
 ) -> EncounterRead:
+    """
+    Retrieves clinical encounter by UUID.
+    Guards access with active consent validation (BOLA / IDOR protection).
+    """
     stmt = select(ClinicalEncounter).where(ClinicalEncounter.id == encounter_id)
     result = await db.execute(stmt)
     encounter = result.scalars().first()
@@ -91,6 +98,15 @@ async def get_encounter(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Clinical encounter not found",
         )
+
+    # Validate active consent session
+    await require_active_consent(
+        patient_id=encounter.patient_id,
+        physician_id=physician_id,
+        db=db,
+        x_physician_id=x_physician_id,
+    )
+
     return encounter
 
 
@@ -101,8 +117,13 @@ async def get_encounter(
 )
 async def list_patient_encounters(
     patient_id: UUID,
+    consent: ConsentGrant = Depends(require_active_consent),
     db: AsyncSession = Depends(get_db),
 ) -> List[EncounterRead]:
+    """
+    Lists clinical encounters for a patient.
+    Requires active consent grant for the requesting physician (BOLA / IDOR protection).
+    """
     stmt = (
         select(ClinicalEncounter)
         .where(ClinicalEncounter.patient_id == patient_id)

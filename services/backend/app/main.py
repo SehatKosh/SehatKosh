@@ -14,7 +14,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
+from app.core.middleware import SecurityHeadersMiddleware
 from app.api.v1.router import router as v1_router
+
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -63,6 +65,7 @@ app = FastAPI(
 # ---------------------------------------------------------------------------
 
 # Adjustment #3 (mandatory): CORS configured to allow the doctor-web portal
+
 # on localhost:3000 and 127.0.0.1:3000 for local development.
 # In production, CORS_ORIGINS should be set to the deployed Vercel URL via env.
 app.add_middleware(
@@ -72,6 +75,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register OWASP defensive security headers & rate limiting
+app.add_middleware(SecurityHeadersMiddleware)
+
 
 # ---------------------------------------------------------------------------
 # Routers

@@ -107,23 +107,45 @@ export default function SuperAdminOverviewPage() {
       </div>
 
       {/* Metric tiles */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {tiles.map((tile) => {
           const Icon = tile.icon;
+          const isClickable = Boolean(tile.href);
           const inner = (
-            <div className={cn("rounded-2xl border p-5 flex flex-col gap-3", tile.bg, tile.href && "hover:shadow-md cursor-pointer transition-shadow")}>
-              <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center relative", tile.iconBg)}>
-                <Icon className={cn("h-5 w-5", tile.iconColor)} />
-                {tile.pulse && (
-                  <span className="absolute -top-1 -right-1 h-3 w-3">
-                    <span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" />
-                    <span className="relative block h-3 w-3 rounded-full bg-red-500" />
+            <div
+              className={cn(
+                "rounded-2xl border p-5 flex flex-col justify-between transition-all duration-200 relative",
+                tile.bg,
+                isClickable
+                  ? "hover:shadow-lg hover:-translate-y-0.5 hover:border-primary/50 cursor-pointer group"
+                  : "cursor-default opacity-95"
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center relative", tile.iconBg)}>
+                  <Icon className={cn("h-5 w-5", tile.iconColor)} />
+                  {tile.pulse && (
+                    <span className="absolute -top-1 -right-1 h-3 w-3">
+                      <span className="animate-ping absolute h-full w-full rounded-full bg-red-400 opacity-75" />
+                      <span className="relative block h-3 w-3 rounded-full bg-red-500" />
+                    </span>
+                  )}
+                </div>
+                {isClickable ? (
+                  <span className="flex items-center gap-1 text-[11px] font-semibold text-primary opacity-80 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">
+                    <span>Manage</span>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground font-medium bg-white/70 px-2 py-0.5 rounded-full border border-slate-200">
+                    Static Metric
                   </span>
                 )}
               </div>
-              <div>
+
+              <div className="mt-4">
                 <p className="text-2xl font-black text-foreground">{tile.value}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{tile.label}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 font-medium">{tile.label}</p>
               </div>
             </div>
           );

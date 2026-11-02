@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Loader2, SendHorizonal, CheckCircle2, Smartphone } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Loader2, SendHorizonal, CheckCircle2, Smartphone, Search, User, ShieldCheck } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,7 @@ import {
 } from "./ui/dialog";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import type { Patient } from "@/lib/mockData";
+import { MOCK_PATIENTS, type Patient } from "@/lib/mockData";
 import { useToast } from "./ToastProvider";
 
 interface RequestAccessModalProps {
@@ -24,15 +24,22 @@ type Scope = "full_history" | "rx_allergies" | "emergency_vitals";
 type Duration = "4h" | "24h" | "7d";
 
 const SCOPE_OPTIONS: { value: Scope; label: string; desc: string }[] = [
-  { value: "full_history", label: "Full Longitudinal History", desc: "All records, prescriptions, labs, and wearable data" },
-  { value: "rx_allergies", label: "Prescriptions & Allergies Only", desc: "Active regimen, allergy list, and medication history" },
-  { value: "emergency_vitals", label: "Emergency Vitals Only", desc: "Real-time vitals and active allergy flags" },
+  { value: "full_history", label: "Full History", desc: "Complete records, prescriptions, and vitals" },
+  { value: "rx_allergies", label: "Rx & Allergies", desc: "Active medications and safety flags" },
+  { value: "emergency_vitals", label: "Emergency Vitals", desc: "Live vitals and critical allergies" },
 ];
 
 const DURATION_OPTIONS: { value: Duration; label: string }[] = [
-  { value: "4h", label: "4 Hours (Single Visit)" },
+  { value: "4h", label: "4 Hours" },
   { value: "24h", label: "24 Hours" },
   { value: "7d", label: "7 Days" },
+];
+
+const QUICK_PURPOSES = [
+  "Routine Consultation",
+  "Follow-up Review",
+  "Second Opinion",
+  "Emergency Evaluation",
 ];
 
 export function RequestAccessModal({
@@ -42,26 +49,42 @@ export function RequestAccessModal({
 }: RequestAccessModalProps) {
   const { showToast } = useToast();
   const [step, setStep] = useState<"form" | "awaiting" | "approved">("form");
-  const [patientId, setPatientId] = useState(preselectedPatient?.medicalId ?? "");
+  const [patientQuery, setPatientQuery] = useState("");
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [scope, setScope] = useState<Scope>("full_history");
   const [duration, setDuration] = useState<Duration>("24h");
-  const [purpose, setPurpose] = useState("");
+  const [purpose, setPurpose] = useState("Routine Consultation");
+  const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
-    if (preselectedPatient?.medicalId) {
-      setPatientId(preselectedPatient.medicalId);
+    if (preselectedPatient) {
+      setSelectedPatient(preselectedPatient);
+      setPatientQuery(`${preselectedPatient.name} (${preselectedPatient.medicalId})`);
+    } else {
+      setSelectedPatient(null);
+      setPatientQuery("");
     }
-  }, [preselectedPatient]);
+  }, [preselectedPatient, open]);
+
+  const filteredPatients = useMemo(() => {
+    if (!patientQuery.trim() || selectedPatient) return [];
+    const q = patientQuery.toLowerCase();
+    return MOCK_PATIENTS.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        p.medicalId.toLowerCase().includes(q) ||
+        p.phone?.toLowerCase().includes(q)
+    ).slice(0, 5);
+  }, [patientQuery, selectedPatient]);
 
   const handleSubmit = () => {
     try {
       setStep("awaiting");
       showToast("Access dispatch sent to patient device", "info");
-      // Simulate patient approving after 2.5 seconds
       setTimeout(() => {
         setStep("approved");
         showToast("Access Granted by Patient!", "success");
-      }, 2500);
+      }, 2200);
     } catch (e) {
       console.warn("RequestAccessModal submit error:", e);
       setStep("form");
@@ -72,80 +95,125 @@ export function RequestAccessModal({
     onOpenChange(false);
     setTimeout(() => {
       setStep("form");
-      setPatientId(preselectedPatient?.medicalId ?? "");
-      setPurpose("");
+      setSelectedPatient(preselectedPatient ?? null);
+      setPatientQuery(preselectedPatient ? `${preselectedPatient.name} (${preselectedPatient.medicalId})` : "");
+      setPurpose("Routine Consultation");
+      setShowDropdown(false);
     }, 300);
   };
 
+  const targetId = selectedPatient?.medicalId || patientQuery.trim();
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Request Patient Access</DialogTitle>
-          <DialogDescription>
-            A cryptographic authorization request will be sent to the patient&apos;s SehatKosh mobile app.
+      <DialogContent className="max-w-md p-6">
+        <DialogHeader className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <ShieldCheck className="h-4 w-4" />
+            </div>
+            <DialogTitle className="text-base font-bold">Request Patient Access</DialogTitle>
+          </div>
+          <DialogDescription className="text-xs text-muted-foreground">
+            Sends an instant consent authorization prompt to the patient&apos;s mobile app.
           </DialogDescription>
         </DialogHeader>
 
         {step === "form" && (
-          <div className="space-y-4 pt-1">
-            {/* Patient ID */}
-            <div>
-              <label className="text-xs font-semibold text-foreground block mb-1.5">
-                Patient Medical ID or Phone Number
+          <div className="space-y-4 pt-2">
+            {/* Patient Search / Selector */}
+            <div className="relative">
+              <label className="text-xs font-semibold text-foreground block mb-1">
+                Patient (Name or Medical ID)
               </label>
-              <Input
-                placeholder="e.g. SK-8921-X or +92 300 1234567"
-                value={patientId}
-                onChange={(e) => setPatientId(e.target.value)}
-              />
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Type to search patients..."
+                  value={patientQuery}
+                  onChange={(e) => {
+                    setPatientQuery(e.target.value);
+                    setSelectedPatient(null);
+                    setShowDropdown(true);
+                  }}
+                  onFocus={() => setShowDropdown(true)}
+                  className="pl-8 text-xs h-9"
+                />
+              </div>
+
+              {/* Autocomplete Dropdown */}
+              {showDropdown && filteredPatients.length > 0 && (
+                <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-border rounded-lg shadow-lg overflow-hidden py-1">
+                  {filteredPatients.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPatient(p);
+                        setPatientQuery(`${p.name} (${p.medicalId})`);
+                        setShowDropdown(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center justify-between border-b last:border-b-0 border-slate-100"
+                    >
+                      <div className="flex items-center gap-2">
+                        <User className="h-3.5 w-3.5 text-slate-400" />
+                        <div>
+                          <span className="font-semibold text-foreground">{p.name}</span>
+                          <span className="text-muted-foreground ml-1.5 font-clinical">{p.medicalId}</span>
+                        </div>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground bg-slate-100 px-1.5 py-0.5 rounded">
+                        {p.gender}, {p.age}y
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* Scope */}
+            {/* Scope Selection */}
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1.5">
-                Requested Access Scope
+                Access Scope
               </label>
-              <div className="space-y-2">
-                {SCOPE_OPTIONS.map((opt) => (
-                  <label
-                    key={opt.value}
-                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      scope === opt.value
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:bg-slate-50"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="scope"
-                      value={opt.value}
-                      checked={scope === opt.value}
-                      onChange={() => setScope(opt.value)}
-                      className="mt-0.5 accent-primary"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{opt.label}</p>
-                      <p className="text-xs text-muted-foreground">{opt.desc}</p>
-                    </div>
-                  </label>
-                ))}
+              <div className="grid grid-cols-3 gap-2">
+                {SCOPE_OPTIONS.map((opt) => {
+                  const isSelected = scope === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setScope(opt.value)}
+                      className={`p-2.5 rounded-lg border text-left transition-all ${
+                        isSelected
+                          ? "border-primary bg-primary/5 ring-1 ring-primary/40 shadow-sm"
+                          : "border-border hover:bg-slate-50"
+                      }`}
+                    >
+                      <p className={`text-xs font-semibold ${isSelected ? "text-primary" : "text-foreground"}`}>
+                        {opt.label}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">{opt.desc}</p>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             {/* Duration */}
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1.5">
-                Requested Duration
+                Duration
               </label>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {DURATION_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
+                    type="button"
                     onClick={() => setDuration(opt.value)}
-                    className={`flex-1 py-2 rounded-lg border text-xs font-medium transition-colors ${
+                    className={`py-2 rounded-lg border text-xs font-semibold transition-colors ${
                       duration === opt.value
-                        ? "border-primary bg-primary text-white"
+                        ? "border-primary bg-primary text-white shadow-sm"
                         : "border-border bg-white text-muted-foreground hover:bg-slate-50"
                     }`}
                   >
@@ -155,31 +223,48 @@ export function RequestAccessModal({
               </div>
             </div>
 
-            {/* Purpose */}
+            {/* Clinical Purpose & Quick Chips */}
             <div>
               <label className="text-xs font-semibold text-foreground block mb-1.5">
                 Clinical Purpose
               </label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {QUICK_PURPOSES.map((qp) => (
+                  <button
+                    key={qp}
+                    type="button"
+                    onClick={() => setPurpose(qp)}
+                    className={`text-[11px] px-2.5 py-1 rounded-full border transition-colors ${
+                      purpose === qp
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200"
+                    }`}
+                  >
+                    {qp}
+                  </button>
+                ))}
+              </div>
               <textarea
                 value={purpose}
                 onChange={(e) => setPurpose(e.target.value)}
-                placeholder="e.g. Follow-up consultation for hypertension management..."
+                placeholder="Specify clinical rationale..."
                 rows={2}
-                className="w-full border border-border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                className="w-full border border-border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
               />
             </div>
 
-            <div className="flex gap-3 pt-2">
-              <Button variant="outline" onClick={handleClose} className="flex-1">
+            {/* Action Buttons */}
+            <div className="flex gap-2.5 pt-2">
+              <Button variant="outline" onClick={handleClose} className="flex-1 text-xs">
                 Cancel
               </Button>
               <Button
                 onClick={handleSubmit}
-                disabled={!patientId.trim() || !purpose.trim()}
-                className="flex-1 gap-2"
+                disabled={!targetId || !purpose.trim()}
+                className="flex-1 gap-2 text-xs"
               >
-                <SendHorizonal className="h-4 w-4" />
-                Send Access Request
+                <SendHorizonal className="h-3.5 w-3.5" />
+                Send Request
               </Button>
             </div>
           </div>
@@ -188,19 +273,18 @@ export function RequestAccessModal({
         {step === "awaiting" && (
           <div className="py-8 flex flex-col items-center gap-4 text-center">
             <div className="relative">
-              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                <Smartphone className="h-8 w-8 text-primary" />
+              <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
+                <Smartphone className="h-7 w-7 text-primary" />
               </div>
               <Loader2 className="h-5 w-5 text-primary animate-spin absolute -top-1 -right-1" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-foreground">Awaiting patient approval on mobile device...</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                A push notification has been sent to the patient&apos;s SehatKosh app.
-                This request will expire in 5 minutes.
+              <p className="text-sm font-semibold text-foreground">Waiting for Patient Authorization</p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+                A consent request has been pushed to the patient&apos;s mobile device.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={handleClose}>
+            <Button variant="outline" size="sm" onClick={handleClose} className="text-xs">
               Cancel Request
             </Button>
           </div>
@@ -208,18 +292,18 @@ export function RequestAccessModal({
 
         {step === "approved" && (
           <div className="py-8 flex flex-col items-center gap-4 text-center">
-            <div className="h-16 w-16 rounded-full bg-green-100 flex items-center justify-center">
-              <CheckCircle2 className="h-9 w-9 text-green-600" />
+            <div className="h-14 w-14 rounded-full bg-emerald-100 flex items-center justify-center">
+              <CheckCircle2 className="h-8 w-8 text-emerald-600" />
             </div>
             <div>
-              <p className="text-sm font-bold text-green-700">Access Granted!</p>
+              <p className="text-sm font-bold text-emerald-700">Access Granted!</p>
               <p className="text-xs text-muted-foreground mt-1">
-                Patient has approved your access request. You can now open their dossier.
+                The patient approved access. Record unlocked for consultation.
               </p>
             </div>
-            <Button onClick={handleClose} className="gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              Close & Open Dossier
+            <Button onClick={handleClose} className="gap-2 text-xs">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Proceed to Record
             </Button>
           </div>
         )}

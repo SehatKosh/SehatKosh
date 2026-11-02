@@ -15,8 +15,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SehatKosh Hospital Portal | Multi-Role Clinical System",
-  description: "HIPAA-compliant multi-role clinical web portal for doctors, registrars, administrators, and researchers — Shifa International Hospital",
+  title: "SehatKosh — Healthcare Network Portal",
+  description: "Unified web portal for doctors, help desk, administrators, and researchers.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

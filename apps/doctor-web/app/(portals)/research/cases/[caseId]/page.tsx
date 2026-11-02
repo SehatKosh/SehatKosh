@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useState, use } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import { BookOpen, EyeOff, Save, ChevronLeft, CheckCircle2 } from "lucide-react";
 import { getAnonymizedCaseById } from "@/lib/mockData";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface PageProps {
-  params: Promise<{ caseId: string }>;
+  params?: { caseId?: string };
 }
 
 const OUTCOME_COLORS: Record<string, string> = {
@@ -27,7 +27,8 @@ function RedactedPill({ label }: { label: string }) {
 }
 
 export default function ResearchCasePage({ params }: PageProps) {
-  const { caseId } = use(params);
+  const routeParams = useParams<{ caseId: string }>();
+  const caseId = (routeParams?.caseId as string) || (params?.caseId as string) || "";
   const router = useRouter();
   const caseData = getAnonymizedCaseById(caseId);
   const [note, setNote] = useState("");

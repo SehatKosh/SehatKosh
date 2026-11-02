@@ -96,7 +96,7 @@ export function BreakGlassModal({ open, onOpenChange, onGranted, patientId }: Br
               <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl mb-5">
                 <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
                 <p className="text-xs text-red-700">
-                  For unconscious, trauma, or emergency patients unable to consent via mobile. Immediate 2-hour access is granted and recorded in the HIPAA audit ledger.
+                  For emergency cases unable to consent via mobile. Immediate 2-hour access is granted and recorded in the immutable security audit ledger.
                 </p>
               </div>
 

@@ -10,7 +10,7 @@ interface RoleTab {
   key: string;
   label: string;
   route: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ElementType<{ className?: string }>;
   accentBg: string;
   accentText: string;
   accentBorder: string;

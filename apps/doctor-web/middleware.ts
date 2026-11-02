@@ -28,7 +28,7 @@ export function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/admin")) {
-    return checkRole(["super-admin", "admin"]);
+    return checkRole(["super-admin"]);
   }
 
   if (pathname.startsWith("/hospital-admin")) {

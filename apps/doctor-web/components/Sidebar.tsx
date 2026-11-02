@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -15,7 +15,6 @@ import {
   Upload,
   BookOpen,
   Microscope,
-  Settings,
   LogOut,
   Building2,
   ChevronLeft,
@@ -23,17 +22,20 @@ import {
   ScrollText,
   Hospital,
   FileArchive,
-  FlaskRound,
   Globe,
   ShieldCheck,
   DatabaseZap,
+  Heart,
+  Clock,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 interface NavItem {
   href: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ElementType<{ className?: string }>;
 }
 
 interface PortalConfig {
@@ -41,7 +43,7 @@ interface PortalConfig {
   prefix: string;
   label: string;
   roleLabel: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ElementType<{ className?: string }>;
   accentClass: string;
   staffName: string;
   navItems: NavItem[];
@@ -64,7 +66,7 @@ const PORTALS: PortalConfig[] = [
     key: "registrar",
     prefix: "/registrar",
     label: "SehatKosh Desk",
-    roleLabel: "Help Desk / Registrar",
+    roleLabel: "Help Desk",
     icon: UserCheck,
     accentClass: "bg-emerald-600",
     staffName: "Sana Perveen",
@@ -123,76 +125,67 @@ interface SidebarProps {
 
 export function Sidebar({ onCommandK }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const pathname = usePathname();
 
-  // Derive active portal purely from URL — no localStorage
+  // Derive active portal purely from URL
   const activePortal =
     PORTALS.find((p) => pathname.startsWith(p.prefix)) ?? PORTALS[0];
 
   const PortalIcon = activePortal.icon;
 
+  const handleSignOut = () => {
+    document.cookie = "sehatkosh_role=; path=/; max-age=0";
+    window.location.href = "/login";
+  };
+
   return (
-    <>
-      <aside
-        className={cn(
-          "relative flex flex-col h-full bg-white border-r border-border transition-all duration-300 shrink-0",
-          collapsed ? "w-16" : "w-60"
-        )}
+    <aside
+      className={cn(
+        "relative flex flex-col h-full bg-white border-r border-border transition-all duration-300 shrink-0",
+        collapsed ? "w-16" : "w-64"
+      )}
+    >
+      {/* Toggle */}
+      <button
+        onClick={() => setCollapsed((v) => !v)}
+        className="absolute -right-3 top-6 z-10 h-6 w-6 rounded-full border border-border bg-white shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-slate-50 transition-colors"
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        id="sidebar-collapse-btn"
       >
-        {/* Toggle */}
-        <button
-          onClick={() => setCollapsed((v) => !v)}
-          className="absolute -right-3 top-6 z-10 h-6 w-6 rounded-full border border-border bg-white shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-slate-50 transition-colors"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          id="sidebar-collapse-btn"
-        >
-          {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
-        </button>
+        {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronLeft className="h-3 w-3" />}
+      </button>
 
-        {/* Logo & identity */}
-        <div className={cn("flex items-center gap-3 px-4 py-4 border-b border-border", collapsed && "justify-center px-2")}>
-          <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center text-white shrink-0", activePortal.accentClass)}>
-            <PortalIcon className="h-5 w-5" />
-          </div>
-          {!collapsed && (
-            <div className="min-w-0">
-              <p className="text-sm font-bold text-foreground leading-tight truncate">{activePortal.label}</p>
-              <p className="text-xs text-muted-foreground truncate">{activePortal.staffName}</p>
-            </div>
-          )}
+      {/* Logo & identity with role integrated */}
+      <div className={cn("flex items-center gap-3 px-4 py-5 border-b border-border", collapsed && "justify-center px-2")}>
+        <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center text-white shrink-0", activePortal.accentClass)}>
+          <PortalIcon className="h-5 w-5" />
         </div>
-
-        {/* Role badge when expanded */}
         {!collapsed && (
-          <div className="px-3 py-2 border-b border-border">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Active Role</span>
-            </div>
-            <p className="text-xs font-semibold text-foreground mt-0.5">{activePortal.roleLabel}</p>
+          <div className="min-w-0">
+            <p className="text-base font-bold text-foreground leading-tight truncate">{activePortal.label}</p>
+            <p className="text-sm text-muted-foreground truncate">{activePortal.roleLabel}</p>
           </div>
         )}
+      </div>
 
-        {/* Search / Command K — Doctor only */}
-        {!collapsed && activePortal.key === "doctor" && (
-          <div className="px-3 py-3 border-b border-border">
-            <button
-              onClick={onCommandK}
-              className="w-full flex items-center gap-2 px-3 py-2 rounded-md bg-slate-50 border border-border text-xs text-muted-foreground hover:bg-slate-100 hover:text-foreground transition-colors text-left"
-              id="sidebar-command-k"
-            >
-              <Search className="h-3.5 w-3.5 shrink-0" />
-              <span className="flex-1 truncate">Search patients...</span>
-              <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-border px-1.5 text-[10px] font-mono">⌘K</kbd>
-            </button>
-          </div>
-        )}
+      {/* Search / Command K — Doctor only */}
+      {!collapsed && activePortal.key === "doctor" && (
+        <div className="px-3 py-3 border-b border-border">
+          <button
+            onClick={onCommandK}
+            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-slate-50 border border-border text-sm text-muted-foreground hover:bg-slate-100 hover:text-foreground transition-colors text-left"
+            id="sidebar-command-k"
+          >
+            <Search className="h-4 w-4 shrink-0" />
+            <span className="flex-1 truncate">Search patients...</span>
+            <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded border border-border px-1.5 text-xs font-mono">⌘K</kbd>
+          </button>
+        </div>
+      )}
 
-        {/* Nav items */}
-        <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-          {!collapsed && (
-            <p className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Navigation</p>
-          )}
+      {/* Nav items */}
+      <nav className="flex-1 px-2 py-4 space-y-3 overflow-y-auto">
+        <div className="space-y-1">
           {activePortal.navItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
@@ -201,114 +194,121 @@ export function Sidebar({ onCommandK }: SidebarProps) {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2 rounded-md text-sm transition-colors",
-                  isActive ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-slate-50 hover:text-foreground",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                  isActive ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground hover:bg-slate-50 hover:text-foreground",
                   collapsed && "justify-center px-2"
                 )}
                 title={collapsed ? item.label : undefined}
               >
-                <Icon className="h-4 w-4 shrink-0" />
+                <Icon className="h-5 w-5 shrink-0" />
                 {!collapsed && <span className="truncate">{item.label}</span>}
               </Link>
             );
           })}
+        </div>
 
-          {/* Other portals section */}
-          {!collapsed && (
-            <>
-              <div className="pt-3 pb-1">
-                <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Switch Portal</p>
-              </div>
-              {PORTALS.filter((p) => p.key !== activePortal.key).map((p) => {
-                const PIcon = p.icon;
-                return (
-                  <Link
-                    key={p.key}
-                    href={p.navItems[0].href}
-                    className="flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-slate-50 hover:text-foreground transition-colors opacity-60 hover:opacity-100"
-                    id={`switch-portal-${p.key}`}
-                  >
-                    <PIcon className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{p.roleLabel}</span>
-                  </Link>
-                );
-              })}
-            </>
-          )}
-        </nav>
-
-        {/* Session status */}
+        {/* Meaningful Contextual Widgets to fill empty space for single-page and multi-page portals */}
         {!collapsed && (
-          <div className="px-3 py-3 border-t border-border">
-            <div className="px-3 py-2 rounded-md bg-green-50 border border-green-200">
-              <div className="flex items-center gap-2">
-                <Building2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
-                <p className="text-xs font-medium text-green-700 truncate">Shifa International Hospital</p>
+          <div className="pt-2 px-1">
+            {activePortal.key === "doctor" && (
+              <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-100 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-blue-900 uppercase tracking-wider">Queue Glance</span>
+                  <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                </div>
+                <div className="flex items-baseline justify-between text-xs">
+                  <span className="text-blue-700">Waiting Patients</span>
+                  <span className="font-bold font-clinical text-blue-900">2</span>
+                </div>
+                <div className="flex items-baseline justify-between text-xs">
+                  <span className="text-blue-700">Avg Consult Time</span>
+                  <span className="font-bold font-clinical text-blue-900">14m</span>
+                </div>
               </div>
-              <p className="text-[10px] text-green-600 mt-0.5 pl-5">Session Active</p>
-            </div>
+            )}
+
+            {activePortal.key === "registrar" && (
+              <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-100 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-emerald-900 uppercase tracking-wider">Intake Overview</span>
+                  <span className="flex h-2 w-2 rounded-full bg-emerald-500" />
+                </div>
+                <div className="flex items-baseline justify-between text-xs">
+                  <span className="text-emerald-700">Intakes Today</span>
+                  <span className="font-bold font-clinical text-emerald-900">14</span>
+                </div>
+                <div className="flex items-baseline justify-between text-xs">
+                  <span className="text-emerald-700">Consent Dispatch</span>
+                  <span className="font-semibold text-emerald-800">Operational</span>
+                </div>
+              </div>
+            )}
+
+            {activePortal.key === "hospital-admin" && (
+              <div className="p-3 rounded-xl bg-indigo-50/70 border border-indigo-100 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-indigo-900 uppercase tracking-wider">Operations</span>
+                  <span className="flex h-2 w-2 rounded-full bg-indigo-500" />
+                </div>
+                <div className="flex items-baseline justify-between text-xs">
+                  <span className="text-indigo-700">Staff on Duty</span>
+                  <span className="font-bold font-clinical text-indigo-900">4 / 7</span>
+                </div>
+                <div className="flex items-baseline justify-between text-xs">
+                  <span className="text-indigo-700">OCR Ingest Pipeline</span>
+                  <span className="font-semibold text-indigo-800">Ready</span>
+                </div>
+              </div>
+            )}
+
+            {activePortal.key === "admin" && (
+              <div className="p-3 rounded-xl bg-violet-50/70 border border-violet-100 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-violet-900 uppercase tracking-wider">Security State</span>
+                  <span className="flex h-2 w-2 rounded-full bg-violet-500" />
+                </div>
+                <div className="flex items-baseline justify-between text-xs">
+                  <span className="text-violet-700">Quorum Nodes</span>
+                  <span className="font-bold font-clinical text-violet-900">2 / 3 Active</span>
+                </div>
+                <div className="flex items-baseline justify-between text-xs">
+                  <span className="text-violet-700">Ledger Integrity</span>
+                  <span className="font-semibold text-violet-800">Verified</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
+      </nav>
 
-        {/* Bottom actions */}
-        <div className={cn("px-2 py-3 border-t border-border space-y-0.5", collapsed && "px-2")}>
-          <button
-            onClick={() => setSettingsOpen(true)}
-            className={cn("w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-muted-foreground hover:bg-slate-50 hover:text-foreground transition-colors", collapsed && "justify-center px-2")}
-            title={collapsed ? "Settings" : undefined}
-            id="sidebar-settings-btn"
-          >
-            <Settings className="h-4 w-4 shrink-0" />
-            {!collapsed && <span>System Settings</span>}
-          </button>
-          <Link
-            href="/doctor/queue"
-            className={cn("w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors", collapsed && "justify-center px-2")}
-            title={collapsed ? "Sign Out" : undefined}
-            id="sidebar-signout-btn"
-          >
-            <LogOut className="h-4 w-4 shrink-0" />
-            {!collapsed && <span>Sign Out</span>}
-          </Link>
-        </div>
-      </aside>
-
-      {/* Settings modal */}
-      {settingsOpen && (
-        <div
-          className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setSettingsOpen(false)}
-        >
-          <div
-            className="bg-white rounded-2xl shadow-2xl border border-border w-full max-w-sm p-6 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-slate-100 flex items-center justify-center">
-                <Settings className="h-5 w-5 text-slate-600" />
-              </div>
-              <div>
-                <h2 className="text-sm font-bold text-foreground">System Settings</h2>
-                <p className="text-xs text-muted-foreground">SehatKosh Hospital Portal v2.0</p>
-              </div>
+      {/* Session info */}
+      {!collapsed && (
+        <div className="px-3 py-3 border-t border-border">
+          <div className="px-3 py-3 rounded-xl bg-slate-50 border border-border">
+            <div className="flex items-center gap-2 mb-2">
+              <Building2 className="h-4 w-4 text-slate-500 shrink-0" />
+              <p className="text-sm font-medium text-foreground truncate">Healthcare Network</p>
             </div>
-            <div className="space-y-2 text-xs text-muted-foreground border border-border rounded-xl p-3 bg-slate-50">
-              <div className="flex justify-between"><span>Hospital</span><span className="font-semibold text-foreground">Shifa International</span></div>
-              <div className="flex justify-between"><span>Session Timeout</span><span className="font-semibold text-foreground">30 minutes</span></div>
-              <div className="flex justify-between"><span>Data Jurisdiction</span><span className="font-semibold text-foreground">Pakistan (PKR)</span></div>
-              <div className="flex justify-between"><span>Portal Version</span><span className="font-clinical font-semibold text-foreground">2.0.1-stable</span></div>
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-green-500 shrink-0" />
+              <p className="text-xs text-muted-foreground">{activePortal.staffName}</p>
             </div>
-            <p className="text-[11px] text-muted-foreground text-center">Full settings management is available in the Super Admin portal.</p>
-            <button
-              onClick={() => setSettingsOpen(false)}
-              className="w-full py-2 rounded-xl bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800 transition-colors"
-              id="settings-close-btn"
-            >
-              Close
-            </button>
           </div>
         </div>
       )}
-    </>
+
+      {/* Sign out */}
+      <div className={cn("px-2 py-3 border-t border-border", collapsed && "px-2")}>
+        <button
+          onClick={handleSignOut}
+          className={cn("w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors", collapsed && "justify-center px-2")}
+          title={collapsed ? "Sign Out" : undefined}
+          id="sidebar-signout-btn"
+        >
+          <LogOut className="h-5 w-5 shrink-0" />
+          {!collapsed && <span>Sign Out</span>}
+        </button>
+      </div>
+    </aside>
   );
 }

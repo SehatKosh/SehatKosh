@@ -103,7 +103,7 @@ export default function DoctorQueuePage() {
             <h1 className="text-xl font-bold text-foreground">Patient Queue</h1>
           </div>
           <p className="text-xs text-muted-foreground">
-            Dr. Tariq Khan · Cardiology, Shifa International ·{" "}
+            Dr. Tariq Khan · Cardiology ·{" "}
             <span className="font-semibold text-amber-600">
               {waiting} patient{waiting !== 1 ? "s" : ""} waiting
             </span>

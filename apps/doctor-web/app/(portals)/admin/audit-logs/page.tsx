@@ -99,7 +99,7 @@ export default function AuditLogsPage() {
               <ScrollText className="h-4 w-4 text-slate-700" />
             </div>
             <h1 className="text-xl font-bold text-foreground">
-              HIPAA & Access Compliance Ledger
+              Access & Security Audit Ledger
             </h1>
           </div>
           <p className="text-xs text-muted-foreground">

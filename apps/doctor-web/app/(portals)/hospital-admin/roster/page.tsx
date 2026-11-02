@@ -54,7 +54,7 @@ export default function HospitalAdminRosterPage() {
       role: form.role,
       department: form.department,
       roomNumber: form.role === "doctor" ? form.roomNumber || undefined : undefined,
-      hospitalName: "Shifa International Hospital",
+      hospitalName: "Central Hospital",
       onDuty: false,
       email: form.email,
     };
@@ -229,7 +229,7 @@ export default function HospitalAdminRosterPage() {
               </div>
               <div>
                 <h2 className="text-sm font-bold text-foreground">Add New Staff Member</h2>
-                <p className="text-xs text-muted-foreground">Shifa International Hospital</p>
+                <p className="text-xs text-muted-foreground">Authorized Staff Network</p>
               </div>
             </div>
 
@@ -266,7 +266,7 @@ export default function HospitalAdminRosterPage() {
                 <input
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  placeholder="name@shifa.edu.pk"
+                  placeholder="name@hospital.org"
                   className="w-full text-sm border border-border rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30"
                   id="new-staff-email"
                 />

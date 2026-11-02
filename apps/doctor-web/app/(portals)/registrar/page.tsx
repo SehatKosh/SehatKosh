@@ -51,7 +51,7 @@ export default function RegistrarPage() {
             <h1 className="text-xl font-bold text-foreground">Patient Intake Desk</h1>
           </div>
           <p className="text-xs text-muted-foreground">
-            Sana Perveen · Front Desk · Shifa International Hospital
+            Sana Perveen · Front Desk Intake Desk
           </p>
         </div>
         <div className="flex items-center gap-2">

@@ -5,30 +5,30 @@ import { useRouter } from "next/navigation";
 import {
   Stethoscope,
   UserCheck,
-  ShieldAlert,
-  FlaskConical,
+  Building2,
   Eye,
   EyeOff,
   Lock,
   Mail,
-  ShieldCheck,
   Loader2,
   ChevronRight,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-type UserRole = "doctor" | "registrar" | "admin" | "researcher";
+type UserRole = "doctor" | "registrar" | "hospital-admin";
 
 interface RoleConfig {
   role: UserRole;
   label: string;
   subtitle: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ElementType<{ className?: string }>;
   color: string;
   email: string;
   homeRoute: string;
+  cookieRole: string;
 }
 
 const ROLES: RoleConfig[] = [
@@ -38,35 +38,29 @@ const ROLES: RoleConfig[] = [
     subtitle: "Patient dossier & clinical workspace",
     icon: Stethoscope,
     color: "text-blue-600 bg-blue-50 border-blue-200 group-hover:border-blue-400",
-    email: "tariq.khan@shifa.edu.pk",
+    email: "tariq.khan@sehatkosh.org",
     homeRoute: "/doctor/queue",
+    cookieRole: "doctor",
   },
   {
     role: "registrar",
-    label: "Desk Registrar",
+    label: "Help Desk",
     subtitle: "Patient intake & consent dispatch",
     icon: UserCheck,
     color: "text-emerald-600 bg-emerald-50 border-emerald-200 group-hover:border-emerald-400",
-    email: "sana.p@shifa.edu.pk",
+    email: "sana.p@sehatkosh.org",
     homeRoute: "/registrar",
+    cookieRole: "registrar",
   },
   {
-    role: "admin",
+    role: "hospital-admin",
     label: "Hospital Administrator",
-    subtitle: "Operations, audit & record ingestion",
-    icon: ShieldAlert,
+    subtitle: "Staff management & record ingestion",
+    icon: Building2,
     color: "text-violet-600 bg-violet-50 border-violet-200 group-hover:border-violet-400",
-    email: "admin@shifa.edu.pk",
-    homeRoute: "/admin/overview",
-  },
-  {
-    role: "researcher",
-    label: "Medical Researcher",
-    subtitle: "De-identified cohort & case explorer",
-    icon: FlaskConical,
-    color: "text-amber-600 bg-amber-50 border-amber-200 group-hover:border-amber-400",
-    email: "researcher@shifa.edu.pk",
-    homeRoute: "/research/explorer",
+    email: "admin@sehatkosh.org",
+    homeRoute: "/hospital-admin/roster",
+    cookieRole: "hospital-admin",
   },
 ];
 
@@ -103,41 +97,41 @@ export default function LoginPage() {
     if (mfaCode.length !== 6) { setError("Enter the 6-digit code."); return; }
     setLoading(true);
     await new Promise((r) => setTimeout(r, 600));
-    const roleVal = selectedRole?.role === "admin" ? "super-admin" : (selectedRole?.role || "doctor");
+
+    const roleVal = selectedRole?.cookieRole || "doctor";
     document.cookie = `sehatkosh_role=${roleVal}; path=/; max-age=86400`;
     setLoading(false);
-    router.push(selectedRole!.homeRoute);
+
+    // Use window.location for reliable navigation after cookie set
+    window.location.href = selectedRole!.homeRoute;
   };
 
   return (
     <div className="w-full max-w-lg">
       {/* Header */}
       <div className="mb-8 text-center">
-        <div className="inline-flex items-center justify-center h-14 w-14 rounded-2xl bg-primary mb-4 shadow-lg shadow-blue-200">
-          <Stethoscope className="h-7 w-7 text-white" />
-        </div>
-        <h1 className="text-2xl font-bold text-foreground">SehatKosh Clinical Portal</h1>
-        <p className="text-sm text-muted-foreground mt-1">Shifa International Hospital — Secure Access</p>
+        <h1 className="text-2xl font-bold text-foreground">Welcome Back</h1>
+        <p className="text-sm text-muted-foreground mt-1">Sign in to your clinical workspace</p>
       </div>
 
       <div className="bg-white border border-border rounded-2xl shadow-lg overflow-hidden">
         {/* Step indicator */}
         <div className="flex border-b border-border">
           {(["role", "credentials", "mfa"] as const).map((s, i) => (
-            <div key={s} className={cn("flex-1 py-2.5 text-center text-xs font-semibold transition-colors",
+            <div key={s} className={cn("flex-1 py-3 text-center text-sm font-semibold transition-colors",
               step === s ? "bg-primary text-white" : i < ["role","credentials","mfa"].indexOf(step) ? "bg-primary/10 text-primary" : "text-muted-foreground")}>
               {i + 1}. {s === "role" ? "Select Role" : s === "credentials" ? "Sign In" : "Verify"}
             </div>
           ))}
         </div>
 
-        <div className="p-7">
+        <div className="p-8">
           {/* Step 1: Role Selection */}
           {step === "role" && (
             <div>
-              <h2 className="text-base font-bold text-foreground mb-1">Who are you signing in as?</h2>
-              <p className="text-xs text-muted-foreground mb-5">Select your clinical role to access your workspace.</p>
-              <div className="grid grid-cols-2 gap-3">
+              <h2 className="text-lg font-bold text-foreground mb-2">Who are you signing in as?</h2>
+              <p className="text-sm text-muted-foreground mb-6">Select your role to access your workspace.</p>
+              <div className="space-y-3">
                 {ROLES.map((rc) => {
                   const Icon = rc.icon;
                   return (
@@ -145,13 +139,16 @@ export default function LoginPage() {
                       key={rc.role}
                       id={`role-${rc.role}`}
                       onClick={() => handleRoleSelect(rc)}
-                      className="group text-left p-4 rounded-xl border-2 border-border hover:shadow-md transition-all duration-200 hover:-translate-y-0.5"
+                      className="group w-full text-left p-5 rounded-xl border-2 border-border hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 flex items-center gap-4"
                     >
-                      <div className={cn("h-9 w-9 rounded-lg border flex items-center justify-center mb-3 transition-all", rc.color)}>
-                        <Icon className="h-5 w-5" />
+                      <div className={cn("h-12 w-12 rounded-xl border flex items-center justify-center shrink-0 transition-all", rc.color)}>
+                        <Icon className="h-6 w-6" />
                       </div>
-                      <p className="text-xs font-bold text-foreground leading-tight">{rc.label}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5 leading-snug">{rc.subtitle}</p>
+                      <div>
+                        <p className="text-base font-bold text-foreground">{rc.label}</p>
+                        <p className="text-sm text-muted-foreground mt-0.5">{rc.subtitle}</p>
+                      </div>
+                      <ChevronRight className="h-5 w-5 text-muted-foreground ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                     </button>
                   );
                 })}
@@ -162,65 +159,59 @@ export default function LoginPage() {
           {/* Step 2: Credentials */}
           {step === "credentials" && selectedRole && (
             <div>
-              <div className="flex items-center gap-2 mb-5">
-                <button onClick={() => setStep("role")} className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1">← Back</button>
-                <span className="text-xs text-muted-foreground">·</span>
-                <span className="text-xs font-semibold text-foreground">{selectedRole.label}</span>
+              <div className="flex items-center gap-3 mb-6">
+                <button onClick={() => setStep("role")} className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+                  <ArrowLeft className="h-4 w-4" /> Back
+                </button>
+                <span className="text-sm text-muted-foreground">·</span>
+                <span className="text-sm font-semibold text-foreground">{selectedRole.label}</span>
               </div>
-              <h2 className="text-base font-bold text-foreground mb-1">Institutional Sign In</h2>
-              <p className="text-xs text-muted-foreground mb-5">Access your {selectedRole.label.toLowerCase()} workspace securely.</p>
-              <form onSubmit={handleCredentials} className="space-y-4">
+              <h2 className="text-lg font-bold text-foreground mb-6">Sign In</h2>
+              <form onSubmit={handleCredentials} className="space-y-5">
                 <div>
-                  <label className="text-xs font-semibold text-foreground block mb-1.5">Institutional Email</label>
+                  <label className="text-sm font-semibold text-foreground block mb-2">Email</label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="doctor@hospital.edu.pk" className="pl-9" id="login-email" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="doctor@hospital.edu.pk" className="pl-10 h-12 text-base" id="login-email" />
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-foreground block mb-1.5">Password</label>
+                  <label className="text-sm font-semibold text-foreground block mb-2">Password</label>
                   <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="pl-9 pr-10" id="login-password" />
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                    <Input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" className="pl-10 pr-12 h-12 text-base" id="login-password" />
                     <button type="button" onClick={() => setShowPassword((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
                   </div>
                 </div>
-                {error && <p className="text-xs text-red-500">{error}</p>}
-                <Button type="submit" className="w-full gap-2" disabled={loading} id="login-submit">
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronRight className="h-4 w-4" />}
-                  Continue to 2FA
+                {error && <p className="text-sm text-red-500">{error}</p>}
+                <Button type="submit" className="w-full gap-2 h-12 text-base" disabled={loading} id="login-submit">
+                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ChevronRight className="h-5 w-5" />}
+                  Continue to Verification
                 </Button>
               </form>
-              <div className="mt-5 flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5">
-                <ShieldCheck className="h-4 w-4 text-blue-600 shrink-0" />
-                <p className="text-xs text-blue-700">All access is logged and audited in compliance with PDPA & HIPAA.</p>
-              </div>
             </div>
           )}
 
           {/* Step 3: MFA */}
           {step === "mfa" && (
             <div>
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                <ShieldCheck className="h-6 w-6 text-primary" />
-              </div>
-              <h2 className="text-base font-bold text-foreground mb-1">Two-Factor Verification</h2>
-              <p className="text-xs text-muted-foreground mb-5">Enter the 6-digit code from your authenticator app.</p>
-              <form onSubmit={handleMfa} className="space-y-4">
+              <h2 className="text-lg font-bold text-foreground mb-2">Two-Factor Verification</h2>
+              <p className="text-sm text-muted-foreground mb-6">Enter the 6-digit code from your authenticator app.</p>
+              <form onSubmit={handleMfa} className="space-y-5">
                 <div>
-                  <label className="text-xs font-semibold text-foreground block mb-1.5">Authenticator Code</label>
+                  <label className="text-sm font-semibold text-foreground block mb-2">Authenticator Code</label>
                   <Input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={6} value={mfaCode}
                     onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    placeholder="000000" className="text-center text-2xl tracking-[0.5em] font-mono h-14" id="mfa-code" />
-                  <p className="text-xs text-muted-foreground mt-1 text-center">Demo: enter any 6 digits</p>
+                    placeholder="000000" className="text-center text-2xl tracking-[0.5em] font-mono h-16" id="mfa-code" />
+                  <p className="text-sm text-muted-foreground mt-2 text-center">Demo: enter any 6 digits</p>
                 </div>
-                {error && <p className="text-xs text-red-500 text-center">{error}</p>}
+                {error && <p className="text-sm text-red-500 text-center">{error}</p>}
                 <div className="flex gap-3">
-                  <Button type="button" variant="outline" onClick={() => setStep("credentials")} className="flex-1">Back</Button>
-                  <Button type="submit" className="flex-1 gap-2" disabled={loading} id="mfa-submit">
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+                  <Button type="button" variant="outline" onClick={() => setStep("credentials")} className="flex-1 h-12 text-base">Back</Button>
+                  <Button type="submit" className="flex-1 gap-2 h-12 text-base" disabled={loading} id="mfa-submit">
+                    {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : null}
                     Sign In
                   </Button>
                 </div>

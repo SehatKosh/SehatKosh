@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, use } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState } from "react";
+import { useRouter, useParams } from "next/navigation";
 import {
   FileText, FileSearch, Activity, ShieldAlert, AlertTriangle, RefreshCw, Lock,
 } from "lucide-react";
@@ -19,11 +19,12 @@ import { useConsentSession } from "@/hooks/useConsentSession";
 import { RequestAccessModal } from "@/components/RequestAccessModal";
 
 interface PageProps {
-  params: Promise<{ id: string }>;
+  params?: { id?: string };
 }
 
 export default function DoctorDossierPage({ params }: PageProps) {
-  const { id } = use(params);
+  const routeParams = useParams<{ id: string }>();
+  const id = (routeParams?.id as string) || (params?.id as string) || "";
   const router = useRouter();
 
   const { data: dossier, isLoading, error } = usePatient(id);

@@ -35,7 +35,7 @@ import { useState } from "react";
 interface NavItem {
   href: string;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ElementType<{ className?: string }>;
 }
 
 interface PortalConfig {
@@ -43,7 +43,7 @@ interface PortalConfig {
   prefix: string;
   label: string;
   roleLabel: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ElementType<{ className?: string }>;
   accentClass: string;
   staffName: string;
   navItems: NavItem[];

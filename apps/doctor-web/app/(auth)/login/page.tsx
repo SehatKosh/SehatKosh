@@ -24,7 +24,7 @@ interface RoleConfig {
   role: UserRole;
   label: string;
   subtitle: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ElementType<{ className?: string }>;
   color: string;
   email: string;
   homeRoute: string;

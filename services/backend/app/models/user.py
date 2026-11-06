@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import DateTime, String
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -11,6 +11,7 @@ from app.models.base import Base
 
 if TYPE_CHECKING:
     from app.models.patient import PatientProfile
+    from app.models.staff import Practitioner
 
 
 class User(Base):
@@ -34,4 +35,9 @@ class User(Base):
         "PatientProfile",
         back_populates="user",
         uselist=False,
+    )
+    practitioner_profiles: Mapped[List["Practitioner"]] = relationship(
+        "Practitioner",
+        back_populates="user",
+        cascade="all, delete-orphan",
     )

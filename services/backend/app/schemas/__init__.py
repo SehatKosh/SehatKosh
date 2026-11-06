@@ -13,6 +13,14 @@ from app.schemas.quorum import (
     QuorumVoteResponse,
     QuorumResponse,
 )
+from app.schemas.facility import (
+    FacilityResponse,
+    DepartmentResponse,
+    PractitionerResponse,
+    PatientFacilityRecordResponse,
+    TriageQueueItemResponse,
+    TriageEnqueueRequest,
+)
 
 __all__ = [
     "EncounterCreate",
@@ -28,5 +36,10 @@ __all__ = [
     "QuorumVoteRequest",
     "QuorumVoteResponse",
     "QuorumResponse",
+    "FacilityResponse",
+    "DepartmentResponse",
+    "PractitionerResponse",
+    "PatientFacilityRecordResponse",
+    "TriageQueueItemResponse",
+    "TriageEnqueueRequest",
 ]
-

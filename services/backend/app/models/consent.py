@@ -11,6 +11,7 @@ from app.models.base import Base
 
 if TYPE_CHECKING:
     from app.models.patient import PatientProfile
+    from app.models.facility import Facility
 
 
 class ConsentGrant(Base):
@@ -32,6 +33,12 @@ class ConsentGrant(Base):
         nullable=False,
         index=True,
     )
+    facility_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True).with_variant(PG_UUID(as_uuid=True), "postgresql"),
+        ForeignKey("facilities.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     status: Mapped[str] = mapped_column(String(20), default="active", nullable=False)  # active, expired, revoked
     granted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -49,3 +56,4 @@ class ConsentGrant(Base):
         "PatientProfile",
         back_populates="consent_grants",
     )
+    facility: Mapped[Optional["Facility"]] = relationship("Facility")

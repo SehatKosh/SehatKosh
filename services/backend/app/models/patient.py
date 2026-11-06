@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String
+from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON, UUID
@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from app.models.user import User
     from app.models.encounter import ClinicalEncounter
     from app.models.consent import ConsentGrant
+    from app.models.facility import Facility
 
 
 class PatientProfile(Base):
@@ -59,3 +60,42 @@ class PatientProfile(Base):
         back_populates="patient",
         cascade="all, delete-orphan",
     )
+    facility_records: Mapped[List["PatientFacilityRecord"]] = relationship(
+        "PatientFacilityRecord",
+        back_populates="patient",
+        cascade="all, delete-orphan",
+    )
+
+
+class PatientFacilityRecord(Base):
+    __tablename__ = "patient_facility_records"
+    __table_args__ = (
+        UniqueConstraint("facility_id", "local_mrn", name="uq_facility_local_mrn"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True).with_variant(PG_UUID(as_uuid=True), "postgresql"),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    patient_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True).with_variant(PG_UUID(as_uuid=True), "postgresql"),
+        ForeignKey("patient_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    facility_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True).with_variant(PG_UUID(as_uuid=True), "postgresql"),
+        ForeignKey("facilities.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    local_mrn: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    registered_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    patient: Mapped["PatientProfile"] = relationship("PatientProfile", back_populates="facility_records")
+    facility: Mapped["Facility"] = relationship("Facility", back_populates="patient_records")

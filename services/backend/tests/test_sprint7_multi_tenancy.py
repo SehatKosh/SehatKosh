@@ -366,3 +366,128 @@ async def test_enterprise_encounter_model_fields(client: AsyncClient):
         assert saved.vitals_snapshot["pulse"] == 130
         assert saved.status == "FINALIZED"
 
+
+
+@pytest.mark.asyncio
+async def test_cross_facility_encounter_consent_boundary(client: AsyncClient):
+    """
+    Dual-Custody Guarantee:
+    Encounter created at Hospital A (PIMS) cannot be accessed by Hospital B doctor (Razi)
+    without an active patient consent grant.
+    """
+    enc_id = uuid.uuid4()
+    async with TestAsyncSession() as session:
+        enc = ClinicalEncounter(
+            id=enc_id,
+            patient_id=PATIENT_1_ID,
+            facility_id=PIMS_ID,
+            practitioner_id=PRACTITIONER_PIMS_ID,
+            encounter_class="OPD",
+            triage_priority="ROUTINE",
+            physician_name="Dr. Tariq Khan",
+            facility_name="Pakistan Institute of Medical Sciences (PIMS)",
+            encounter_date=date.today(),
+            soap_notes={"assessment": "Hypertension Stage 1"},
+            fhir_bundle={"resourceType": "Bundle", "type": "document", "entry": []},
+            status="FINALIZED",
+        )
+        session.add(enc)
+        await session.commit()
+
+    # 1. Doctor at Razi attempts to fetch encounter directly WITHOUT consent -> 403 Forbidden
+    unauthorized_resp = await client.get(
+        f"/api/v1/encounters/{enc_id}?physician_id={DOC_RAZI_USER_ID}"
+    )
+    assert unauthorized_resp.status_code == 403
+    assert "No active consent session found" in unauthorized_resp.json()["detail"]
+
+    # 2. Patient grants 24h consent to Dr. Razi at Razi Hospital
+    now = datetime.now(timezone.utc)
+    grant_resp = await client.post(
+        "/api/v1/consent/grant",
+        json={
+            "patient_id": str(PATIENT_1_ID),
+            "physician_id": str(DOC_RAZI_USER_ID),
+            "valid_hours": 24,
+        },
+    )
+    assert grant_resp.status_code == 201
+
+    # 3. Doctor at Razi can now stream/view the historical PIMS encounter -> 200 OK
+    authorized_resp = await client.get(
+        f"/api/v1/encounters/{enc_id}?physician_id={DOC_RAZI_USER_ID}"
+    )
+    assert authorized_resp.status_code == 200
+    enc_data = authorized_resp.json()
+    assert enc_data["id"] == str(enc_id)
+    assert enc_data["facility_name"] == "Pakistan Institute of Medical Sciences (PIMS)"
+
+
+@pytest.mark.asyncio
+async def test_triage_queue_status_transitions(client: AsyncClient):
+    """
+    Verifies waiting queue lifecycle states:
+    WAITING -> IN_CONSULTATION -> COMPLETED.
+    """
+    # 1. Enqueue patient Ali Raza at PIMS -> status = WAITING
+    enqueue_resp = await client.post(
+        f"/api/v1/facilities/{PIMS_ID}/queue",
+        json={
+            "patient_id": str(PATIENT_1_ID),
+            "department_id": str(PIMS_OPD_ID),
+            "triage_priority": "ROUTINE",
+        },
+    )
+    assert enqueue_resp.status_code == 201
+    entry_id = uuid.UUID(enqueue_resp.json()["id"])
+
+    # Verify Ali is in WAITING queue
+    q_waiting = await client.get(
+        f"/api/v1/facilities/{PIMS_ID}/queue?status=WAITING"
+    )
+    assert q_waiting.status_code == 200
+    waiting_ids = [item["id"] for item in q_waiting.json()]
+    assert str(entry_id) in waiting_ids
+
+    # 2. Transition entry to IN_CONSULTATION (Doctor calls patient in)
+    async with TestAsyncSession() as session:
+        stmt = select(TriageQueueEntry).where(TriageQueueEntry.id == entry_id)
+        res = await session.execute(stmt)
+        entry = res.scalars().first()
+        assert entry is not None
+        entry.status = "IN_CONSULTATION"
+        entry.practitioner_id = PRACTITIONER_PIMS_ID
+        entry.called_at = datetime.now(timezone.utc)
+        await session.commit()
+
+    # Query WAITING queue -> Ali should no longer be listed
+    q_waiting_after = await client.get(
+        f"/api/v1/facilities/{PIMS_ID}/queue?status=WAITING"
+    )
+    assert str(entry_id) not in [item["id"] for item in q_waiting_after.json()]
+
+    # Query IN_CONSULTATION queue -> Ali should be listed with practitioner
+    q_in_consult = await client.get(
+        f"/api/v1/facilities/{PIMS_ID}/queue?status=IN_CONSULTATION"
+    )
+    assert q_in_consult.status_code == 200
+    consult_items = q_in_consult.json()
+    assert str(entry_id) in [item["id"] for item in consult_items]
+    consult_entry = next(i for i in consult_items if i["id"] == str(entry_id))
+    assert consult_entry["practitioner_id"] == str(PRACTITIONER_PIMS_ID)
+
+    # 3. Transition to COMPLETED
+    async with TestAsyncSession() as session:
+        stmt = select(TriageQueueEntry).where(TriageQueueEntry.id == entry_id)
+        res = await session.execute(stmt)
+        entry = res.scalars().first()
+        entry.status = "COMPLETED"
+        entry.completed_at = datetime.now(timezone.utc)
+        await session.commit()
+
+    # Query COMPLETED queue
+    q_completed = await client.get(
+        f"/api/v1/facilities/{PIMS_ID}/queue?status=COMPLETED"
+    )
+    assert q_completed.status_code == 200
+    assert str(entry_id) in [item["id"] for item in q_completed.json()]

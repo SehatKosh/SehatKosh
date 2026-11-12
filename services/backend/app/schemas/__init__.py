@@ -24,6 +24,7 @@ from app.schemas.facility import (
 from app.schemas.staging import (
     StagingUploadResponse,
     StagingPromoteRequest,
+    StagingRejectRequest,
     StagingRecordRead,
 )
 from app.schemas.attachment import (
@@ -63,6 +64,7 @@ __all__ = [
     "TriageEnqueueRequest",
     "StagingUploadResponse",
     "StagingPromoteRequest",
+    "StagingRejectRequest",
     "StagingRecordRead",
     "AttachmentRead",
     "PresignedUrlResponse",

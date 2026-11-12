@@ -15,6 +15,7 @@ import {
   GitFork,
   Loader2,
   Eye,
+  Paperclip,
 } from "lucide-react";
 import { PatientHeader } from "@/components/doctor/PatientHeader";
 import { ClinicalSummaryCard } from "@/components/doctor/ClinicalSummaryCard";
@@ -28,6 +29,7 @@ import { TriageVitalsCard } from "@/components/doctor/TriageVitalsCard";
 import { SoapNoteEditor } from "@/components/doctor/SoapNoteEditor";
 import { MedicationInteractionBanner } from "@/components/doctor/MedicationInteractionBanner";
 import { AmendEncounterModal } from "@/components/doctor/AmendEncounterModal";
+import { AttachmentViewerModal } from "@/components/doctor/AttachmentViewerModal";
 import { Button } from "@/components/ui/button";
 import { usePatient } from "@/hooks/usePatient";
 import { usePatientVitals } from "@/hooks/usePatientVitals";
@@ -58,6 +60,7 @@ export default function DoctorDossierPage({ params }: PageProps) {
   const [activeTab, setActiveTab] = useState<"soap" | "document" | "vitals" | "safety">("soap");
   const [requestModalOpen, setRequestModalOpen] = useState(false);
   const [amendModalOpen, setAmendModalOpen] = useState(false);
+  const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
 
   // Editor vs Viewer mode for SOAP notes
   const [isEditorMode, setIsEditorMode] = useState(false);
@@ -281,6 +284,16 @@ export default function DoctorDossierPage({ params }: PageProps) {
             </div>
 
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setAttachmentModalOpen(true)}
+                className="gap-1.5 text-xs text-slate-700 hover:bg-slate-100"
+              >
+                <Paperclip className="w-3.5 h-3.5 text-sky-600" />
+                Attachments
+              </Button>
+
               {activeTab === "soap" && (
                 <>
                   {isEncounterFinalized ? (
@@ -484,6 +497,13 @@ export default function DoctorDossierPage({ params }: PageProps) {
         onSuccess={(amendmentId) => {
           showToast(`Amendment #${amendmentId.slice(0, 8)} recorded`, "success");
         }}
+      />
+
+      {/* S3 Attachment Vault Viewer Modal */}
+      <AttachmentViewerModal
+        open={attachmentModalOpen}
+        onOpenChange={setAttachmentModalOpen}
+        encounter={selectedEncounter}
       />
     </div>
   );

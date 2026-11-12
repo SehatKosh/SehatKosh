@@ -23,6 +23,10 @@ class StagingPromoteRequest(BaseModel):
     encounter_date: Optional[date] = Field(default=None, description="Clinical encounter date")
 
 
+class StagingRejectRequest(BaseModel):
+    reason: str = Field(..., min_length=1, description="Clinical or administrative justification for rejection")
+
+
 class StagingRecordRead(BaseModel):
     id: UUID
     source_facility_id: Optional[UUID] = None

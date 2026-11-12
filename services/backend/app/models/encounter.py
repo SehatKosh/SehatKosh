@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime, timezone
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import Date, DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
@@ -41,6 +41,22 @@ class ClinicalEncounter(Base):
         nullable=True,
         index=True,
     )
+    parent_encounter_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True).with_variant(PG_UUID(as_uuid=True), "postgresql"),
+        ForeignKey("clinical_encounters.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    source_type: Mapped[str] = mapped_column(
+        String(50),
+        default="HOSPITAL_EMR_NATIVE",
+        nullable=False,
+    )  # HOSPITAL_EMR_NATIVE, HOSPITAL_PLUGIN_IMPORT, PATIENT_MOBILE_OCR, WEARABLE_BLE
+    verification_status: Mapped[str] = mapped_column(
+        String(50),
+        default="CLINICIAN_VERIFIED",
+        nullable=False,
+    )  # CLINICIAN_VERIFIED, PATIENT_CONFIRMED, UNVERIFIED_OCR
     encounter_class: Mapped[str] = mapped_column(
         String(20),
         default="OPD",
@@ -100,4 +116,13 @@ class ClinicalEncounter(Base):
     practitioner: Mapped[Optional["Practitioner"]] = relationship(
         "Practitioner",
         back_populates="encounters",
+    )
+    parent_encounter: Mapped[Optional["ClinicalEncounter"]] = relationship(
+        "ClinicalEncounter",
+        remote_side="ClinicalEncounter.id",
+        back_populates="amendments",
+    )
+    amendments: Mapped[List["ClinicalEncounter"]] = relationship(
+        "ClinicalEncounter",
+        back_populates="parent_encounter",
     )

@@ -79,4 +79,3 @@ class TriageEnqueueRequest(BaseModel):
     chief_complaint: Optional[str] = None
     vitals_snapshot: Optional[dict] = None
     practitioner_id: Optional[UUID] = None
-

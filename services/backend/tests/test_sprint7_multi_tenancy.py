@@ -8,11 +8,11 @@ Satisfies:
 """
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 
 import pytest
 import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
+from httpx import AsyncClient
 import sqlalchemy as sa
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy import select
@@ -21,14 +21,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.database import get_db
 from app.main import app
 from app.models.base import Base
-from app.models.consent import ConsentGrant
 from app.models.department import Department
 from app.models.encounter import ClinicalEncounter
 from app.models.facility import Facility
-from app.models.patient import PatientFacilityRecord, PatientProfile
+from app.models.patient import PatientProfile
 from app.models.queue import TriageQueueEntry
 from app.models.staff import Practitioner
 from app.models.user import User
+
 
 # Ensure UUID compiles cleanly to TEXT in SQLite
 @compiles(sa.UUID, "sqlite")
@@ -367,7 +367,6 @@ async def test_enterprise_encounter_model_fields(client: AsyncClient):
         assert saved.status == "FINALIZED"
 
 
-
 @pytest.mark.asyncio
 async def test_cross_facility_encounter_consent_boundary(client: AsyncClient):
     """
@@ -402,7 +401,6 @@ async def test_cross_facility_encounter_consent_boundary(client: AsyncClient):
     assert "No active consent session found" in unauthorized_resp.json()["detail"]
 
     # 2. Patient grants 24h consent to Dr. Razi at Razi Hospital
-    now = datetime.now(timezone.utc)
     grant_resp = await client.post(
         "/api/v1/consent/grant",
         json={

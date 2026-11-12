@@ -5,6 +5,7 @@ import { FileText, Pill, FlaskConical, Activity, ChevronRight, Clock } from "luc
 import { cn, formatDateTime } from "@/lib/utils";
 import type { Encounter, EncounterType } from "@/lib/mockData";
 import { Badge } from "./ui/badge";
+import { ProvenanceBadge } from "./doctor/ProvenanceBadge";
 
 const TYPE_FILTERS = ["All Records", "Doctor Visits (SOAP)", "Prescriptions", "Lab Reports", "Wearable Summaries"] as const;
 type TypeFilter = (typeof TYPE_FILTERS)[number];
@@ -120,10 +121,17 @@ export function TimelineFeed({ encounters, selectedId, onSelect }: TimelineFeedP
                         </div>
                       </div>
 
-                      {/* Physician */}
-                      <p className="text-xs text-muted-foreground mb-1.5">
-                        {enc.physician} • {enc.clinic}
-                      </p>
+                      {/* Physician & Provenance */}
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <p className="text-xs text-muted-foreground truncate">
+                          {enc.physician} • {enc.clinic}
+                        </p>
+                        <ProvenanceBadge
+                          status={(enc as any).verification_status || (enc.type === "prescription" ? "UNVERIFIED_OCR" : "CLINICIAN_VERIFIED")}
+                          sourceType={(enc as any).source_type || (enc.type === "prescription" ? "PATIENT_MOBILE_OCR" : "HOSPITAL_EMR_NATIVE")}
+                          className="scale-90 origin-right shrink-0"
+                        />
+                      </div>
 
                       {/* Summary snippet */}
                       <p className="text-xs text-foreground leading-relaxed line-clamp-2">

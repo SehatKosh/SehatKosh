@@ -20,7 +20,9 @@ import {
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import NetInfo from "@react-native-community/netinfo";
 import { extractPrescription } from "../../services/apiClient";
+import { enqueueOfflineDocument } from "../../services/offlineQueue";
 import type { ExtractionResponse } from "@sehatkosh/types";
 
 // Processing state labels rendered in the extraction overlay
@@ -47,6 +49,27 @@ export default function ScanDocumentScreen() {
    * 4. On failure: alert user with clean message and allow retaking
    */
   const runExtraction = async (uri: string) => {
+    // Check network connectivity upfront
+    const netState = await NetInfo.fetch();
+    const isOffline = !netState.isConnected || netState.isInternetReachable === false;
+
+    if (isOffline) {
+      setIsCapturing(false);
+      await enqueueOfflineDocument(uri, { source: "CAMERA_SCAN" });
+
+      Alert.alert(
+        "Saved Offline",
+        "No internet connection detected. Your prescription has been stored securely on your device and will be automatically digitized as soon as connectivity is restored.",
+        [
+          {
+            text: "View Records",
+            onPress: () => router.replace("/(tabs)/records"),
+          },
+        ]
+      );
+      return;
+    }
+
     setProcessState(0);
 
     // Advance overlay through progressive states
@@ -80,17 +103,16 @@ export default function ScanDocumentScreen() {
       setProcessState(null);
       setIsCapturing(false);
 
-      const message =
-        err instanceof Error ? err.message : "Document processing failed. Please check your connection.";
-      console.warn("[scan-document] extractPrescription failed:", message);
+      // Gracefully enqueue offline if network failed mid-flight
+      await enqueueOfflineDocument(uri, { source: "CAMERA_SCAN" });
 
       Alert.alert(
-        "Prescription Ingestion Error",
-        message,
+        "Saved Offline",
+        "Network connection interrupted. Your prescription has been saved offline on your device and will sync automatically when online.",
         [
           {
-            text: "Retake Photo",
-            style: "default",
+            text: "View Records",
+            onPress: () => router.replace("/(tabs)/records"),
           },
         ]
       );

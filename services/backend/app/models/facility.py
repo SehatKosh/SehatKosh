@@ -65,4 +65,3 @@ class Facility(Base):
         back_populates="facility",
         cascade="all, delete-orphan",
     )
-

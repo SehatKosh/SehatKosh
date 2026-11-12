@@ -49,4 +49,3 @@ class Department(Base):
         back_populates="department",
         cascade="all, delete-orphan",
     )
-

@@ -64,4 +64,3 @@ class Practitioner(Base):
         "TriageQueueEntry",
         back_populates="practitioner",
     )
-

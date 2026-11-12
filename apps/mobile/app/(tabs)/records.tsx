@@ -9,6 +9,9 @@ import {
   Weight,
   ShieldCheck,
   Clock,
+  CloudOff,
+  CheckCircle2,
+  RefreshCw,
 } from "lucide-react-native";
 import {
   RefreshControl,
@@ -30,6 +33,12 @@ import {
   getPatientEncounters,
   DEFAULT_PATIENT_ID,
 } from "../../services/apiClient";
+import {
+  getOfflineQueue,
+  startAutoSyncListener,
+  syncOfflineItem,
+  type OfflineScanItem,
+} from "../../services/offlineQueue";
 import { AllergyModal, type Allergy } from "../../components/AllergyModal";
 
 // ── Specialty badge colors ─────────────────────────────────────────────────
@@ -143,6 +152,7 @@ export default function RecordsScreen() {
   const allergyModalRef = useRef<BottomSheet>(null);
 
   const [encounters, setEncounters] = useState<ClinicalEncounter[]>(MOCK_RECORDS);
+  const [offlineQueue, setOfflineQueue] = useState<OfflineScanItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLiveSync, setIsLiveSync] = useState(false);
@@ -157,6 +167,9 @@ export default function RecordsScreen() {
     }
 
     try {
+      const queue = await getOfflineQueue();
+      setOfflineQueue(queue);
+
       const patientId = DEFAULT_PATIENT_ID;
       const liveList = await getPatientEncounters(patientId);
       if (liveList && liveList.length > 0) {
@@ -179,6 +192,15 @@ export default function RecordsScreen() {
 
   useEffect(() => {
     loadEncounters();
+  }, [loadEncounters]);
+
+  // Network reconnection auto-sync listener
+  useEffect(() => {
+    const unsubscribe = startAutoSyncListener(() => {
+      getOfflineQueue().then(setOfflineQueue);
+      loadEncounters();
+    });
+    return () => unsubscribe();
   }, [loadEncounters]);
 
   // Allergy state — initialised with existing profile allergies
@@ -282,6 +304,121 @@ export default function RecordsScreen() {
         ═══════════════════════════════════════════════════════ */}
         {activeTab === "history" && (
           <>
+            {/* ── Offline Document Queue (FR-EMR-04) ──────────── */}
+            {offlineQueue.length > 0 && (
+              <View className="mt-4 rounded-2xl border border-slate-200 bg-white p-3.5 space-y-2.5">
+                <View className="flex-row items-center justify-between pb-1 border-b border-slate-100">
+                  <View className="flex-row items-center gap-1.5">
+                    <CloudOff size={14} color="#64748B" />
+                    <Text className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                      Offline Document Queue ({offlineQueue.length})
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={async () => {
+                      for (const item of offlineQueue) {
+                        await syncOfflineItem(item);
+                      }
+                      const updated = await getOfflineQueue();
+                      setOfflineQueue(updated);
+                    }}
+                  >
+                    <Text className="text-xs font-semibold text-sky-600">Sync All</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {offlineQueue.map((item) => {
+                  const isSynced = item.status === "SYNCED";
+                  const isSyncing = item.status === "SYNCING";
+
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        if (isSynced && item.extractionResult) {
+                          router.push({
+                            pathname: "/intake/ocr-verify",
+                            params: {
+                              imageUri: item.localUri,
+                              extraction: JSON.stringify(item.extractionResult),
+                            },
+                          });
+                        } else if (!isSyncing) {
+                          syncOfflineItem(item).then(() => {
+                            getOfflineQueue().then(setOfflineQueue);
+                          });
+                        }
+                      }}
+                      className={`rounded-xl border p-3 ${
+                        isSynced
+                          ? "border-emerald-200 bg-emerald-50/60"
+                          : isSyncing
+                          ? "border-sky-200 bg-sky-50/60"
+                          : "border-amber-200 bg-amber-50/60"
+                      }`}
+                    >
+                      <View className="flex-row items-center justify-between">
+                        <View className="flex-row items-center gap-2.5 flex-1 pr-2">
+                          <View
+                            className={`h-7 w-7 rounded-full items-center justify-center ${
+                              isSynced
+                                ? "bg-emerald-100"
+                                : isSyncing
+                                ? "bg-sky-100"
+                                : "bg-amber-100"
+                            }`}
+                          >
+                            {isSynced ? (
+                              <CheckCircle2 size={15} color="#059669" />
+                            ) : isSyncing ? (
+                              <RefreshCw size={15} color="#0284C7" />
+                            ) : (
+                              <Clock size={15} color="#D97706" />
+                            )}
+                          </View>
+                          <View className="flex-1">
+                            <Text className="text-xs font-bold text-slate-900">
+                              Prescription Document
+                            </Text>
+                            <Text className="text-[10px] text-slate-500">
+                              Captured {new Date(item.capturedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <View
+                          className={`rounded-full px-2 py-0.5 border ${
+                            isSynced
+                              ? "bg-emerald-100 border-emerald-200"
+                              : isSyncing
+                              ? "bg-sky-100 border-sky-200"
+                              : "bg-amber-100 border-amber-200"
+                          }`}
+                        >
+                          <Text
+                            className={`text-[10px] font-bold ${
+                              isSynced
+                                ? "text-emerald-800"
+                                : isSyncing
+                                ? "text-sky-800"
+                                : "text-amber-800"
+                            }`}
+                          >
+                            {isSynced
+                              ? "Digitized • Tap to Verify Meds"
+                              : isSyncing
+                              ? "Digitizing via Vision OCR..."
+                              : "Not Digitized • Saved Offline (Waiting for Internet)"}
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
             {/* Search bar */}
             <View className="mt-5 flex-row items-center rounded-xl border border-slate-200 bg-white px-3">
               <Search size={19} color="#94A3B8" />

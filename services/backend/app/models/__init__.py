@@ -9,6 +9,8 @@ from app.models.encounter import ClinicalEncounter
 from app.models.consent import ConsentGrant
 from app.models.audit import AuditLog
 from app.models.quorum import QuorumRequest, QuorumVote
+from app.models.staging import IngestionStagingRecord
+from app.models.attachment import ClinicalAttachment
 from app.models.prescription import (
     HealthResponse,
     Medication,
@@ -31,6 +33,8 @@ __all__ = [
     "AuditLog",
     "QuorumRequest",
     "QuorumVote",
+    "IngestionStagingRecord",
+    "ClinicalAttachment",
     "HealthResponse",
     "Medication",
     "PrescriptionExtraction",

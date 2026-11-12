@@ -11,6 +11,9 @@ from app.api.v1.research import router as research_router
 from app.api.v1.quorum import router as quorum_router
 from app.api.v1.chat import router as chat_router
 from app.api.v1.facilities import router as facilities_router
+from app.api.v1.clinical import router as clinical_router
+from app.api.v1.ingestion import router as ingestion_router
+from app.api.v1.attachments import router as attachments_router
 from app.core.config import settings
 from app.models.prescription import HealthResponse
 
@@ -28,6 +31,9 @@ router.include_router(queue_router)
 router.include_router(research_router)
 router.include_router(quorum_router)
 router.include_router(chat_router)
+router.include_router(clinical_router)
+router.include_router(ingestion_router)
+router.include_router(attachments_router)
 
 
 @router.get(

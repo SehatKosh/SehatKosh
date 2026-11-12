@@ -35,9 +35,9 @@ from datetime import date
 import pytest
 from httpx import AsyncClient
 
-from app.modules.fhir.adapters import MockFHIRAdapter, ResilientFHIRAdapter
+from app.modules.fhir.adapters import ResilientFHIRAdapter
 from app.modules.fhir.normalizer import normalise_ocr_output, _parse_frequency, _lookup_snomed
-from app.schemas.fhir import FHIRBundle, MedicationRequest, CodeableConcept, Coding
+from app.schemas.fhir import FHIRBundle, MedicationRequest, CodeableConcept
 
 
 # ===========================================================================
@@ -425,7 +425,6 @@ def test_medication_request_defaults():
     assert mr.resourceType == "MedicationRequest"
     assert isinstance(mr.id, str) and len(mr.id) > 0
     assert mr.dosageInstruction == []
-
 
 
 # ===========================================================================

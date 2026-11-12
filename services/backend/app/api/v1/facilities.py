@@ -15,7 +15,6 @@ from app.models.staff import Practitioner
 from app.schemas.facility import (
     DepartmentResponse,
     FacilityResponse,
-    PatientFacilityRecordResponse,
     PractitionerResponse,
     TriageEnqueueRequest,
     TriageQueueItemResponse,
@@ -33,7 +32,7 @@ async def list_facilities(
     db: AsyncSession = Depends(get_db),
 ) -> List[FacilityResponse]:
     """Retrieves all registered, active hospital and clinic tenants."""
-    stmt = select(Facility).where(Facility.is_active == True).order_by(Facility.name.asc())
+    stmt = select(Facility).where(Facility.is_active.is_(True)).order_by(Facility.name.asc())
     result = await db.execute(stmt)
     return list(result.scalars().all())
 
@@ -80,7 +79,7 @@ async def list_facility_departments(
 
     stmt = (
         select(Department)
-        .where(Department.facility_id == facility_id, Department.is_active == True)
+        .where(Department.facility_id == facility_id, Department.is_active.is_(True))
         .order_by(Department.name.asc())
     )
     result = await db.execute(stmt)
@@ -99,7 +98,7 @@ async def list_facility_practitioners(
     """Retrieves registered practitioners and clinical staff for a facility."""
     stmt = (
         select(Practitioner)
-        .where(Practitioner.facility_id == facility_id, Practitioner.is_active == True)
+        .where(Practitioner.facility_id == facility_id, Practitioner.is_active.is_(True))
         .order_by(Practitioner.designation.asc())
     )
     result = await db.execute(stmt)
@@ -341,4 +340,3 @@ async def enqueue_patient(
         local_mrn=pfr.local_mrn,
         cnic_masked=patient.cnic_masked,
     )
-

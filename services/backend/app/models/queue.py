@@ -82,4 +82,3 @@ class TriageQueueEntry(Base):
     department: Mapped["Department"] = relationship("Department", back_populates="queue_entries")
     patient: Mapped["PatientProfile"] = relationship("PatientProfile")
     practitioner: Mapped[Optional["Practitioner"]] = relationship("Practitioner", back_populates="queue_entries")
-

@@ -26,6 +26,7 @@ from app.schemas.encounter import EncounterRead
 from app.schemas.staging import (
     StagingPromoteRequest,
     StagingRecordRead,
+    StagingRejectRequest,
     StagingUploadResponse,
 )
 
@@ -203,6 +204,73 @@ async def promote_staging_record(
     await db.refresh(encounter)
 
     return encounter
+
+
+@router.get(
+    "/staging",
+    response_model=list[StagingRecordRead],
+    summary="List quarantined ingestion staging records",
+)
+async def list_staging_records(
+    facility_id: Optional[UUID] = None,
+    db: AsyncSession = Depends(get_db),
+) -> list[StagingRecordRead]:
+    """
+    Lists records from ingestion_staging_records ordered by created_at DESC.
+    Optionally filter by facility_id.
+    """
+    stmt = select(IngestionStagingRecord).order_by(IngestionStagingRecord.created_at.desc())
+    if facility_id:
+        stmt = stmt.where(IngestionStagingRecord.source_facility_id == facility_id)
+
+    res = await db.execute(stmt)
+    records = res.scalars().all()
+    return list(records)
+
+
+@router.post(
+    "/{staging_id}/reject",
+    response_model=StagingRecordRead,
+    summary="Reject quarantined staging record",
+)
+async def reject_staging_record(
+    staging_id: UUID,
+    payload: StagingRejectRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+) -> StagingRecordRead:
+    """
+    Rejects a quarantined staging record.
+    Appends rejection reason to validation_errors, updates status to REJECTED,
+    and writes an INGESTION_REJECTED audit event.
+    """
+    stmt = select(IngestionStagingRecord).where(IngestionStagingRecord.id == staging_id)
+    res = await db.execute(stmt)
+    staging_rec = res.scalars().first()
+
+    if not staging_rec:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Quarantine staging record not found",
+        )
+
+    errs = list(staging_rec.validation_errors or [])
+    errs.append(f"Rejected: {payload.reason}")
+    staging_rec.validation_errors = errs
+    staging_rec.status = "REJECTED"
+
+    client_ip = request.client.host if request.client else None
+    await log_audit_event(
+        db=db,
+        actor_id="HOSPITAL_ADMIN",
+        action_type="INGESTION_REJECTED",
+        ip_address=client_ip,
+        severity="WARNING",
+    )
+
+    await db.commit()
+    await db.refresh(staging_rec)
+    return staging_rec
 
 
 @router.get(

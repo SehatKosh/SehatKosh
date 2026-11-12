@@ -148,6 +148,61 @@ async def upload_attachment(
 
 
 @router.get(
+    "/encounter/{encounter_id}",
+    response_model=list[AttachmentRead],
+    summary="List all attachments for an encounter",
+)
+async def list_encounter_attachments(
+    encounter_id: UUID,
+    request: Request,
+    physician_id: Optional[UUID] = Query(None),
+    x_patient_id: Optional[UUID] = Header(None, alias="X-Patient-Id"),
+    x_physician_id: Optional[UUID] = Header(None, alias="X-Physician-Id"),
+    db: AsyncSession = Depends(get_db),
+) -> list[AttachmentRead]:
+    """
+    Returns all ClinicalAttachment metadata rows linked to encounter_id.
+    Guarded by active consent session or patient self-ownership.
+    """
+    enc_stmt = select(ClinicalEncounter).where(ClinicalEncounter.id == encounter_id)
+    enc_res = await db.execute(enc_stmt)
+    encounter = enc_res.scalars().first()
+
+    if not encounter:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Clinical encounter not found",
+        )
+
+    # Validate active consent or patient ownership
+    await require_active_consent(
+        patient_id=encounter.patient_id,
+        physician_id=physician_id,
+        x_patient_id=x_patient_id,
+        db=db,
+        x_physician_id=x_physician_id,
+    )
+
+    stmt = select(ClinicalAttachment).where(
+        ClinicalAttachment.encounter_id == encounter_id
+    ).order_by(ClinicalAttachment.created_at.desc())
+    res = await db.execute(stmt)
+    attachments = res.scalars().all()
+
+    client_ip = request.client.host if request.client else None
+    await log_audit_event(
+        db=db,
+        actor_id=str(x_physician_id or physician_id or x_patient_id or "ANONYMOUS"),
+        action_type="ATTACHMENT_LIST",
+        patient_id=str(encounter.patient_id),
+        ip_address=client_ip,
+        severity="INFO",
+    )
+
+    return list(attachments)
+
+
+@router.get(
     "/{attachment_id}/presigned-url",
     response_model=PresignedUrlResponse,
     summary="Get temporary 15-minute presigned download URL",

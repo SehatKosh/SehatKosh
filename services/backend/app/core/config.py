@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str = Field(default="mock_secret")
     AWS_DEFAULT_REGION: str = Field(default="ap-southeast-1")
     S3_BUCKET_NAME: str = Field(default="sehatkosh-prescriptions")
+    S3_VAULT_BUCKET: str = Field(default="sehatkosh-vault")
+    ENABLE_LARGE_MODALITY_UPLOADS: bool = Field(default=False)
 
     # ------------------------------------------------------------------
     # CORS

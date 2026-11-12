@@ -1,4 +1,4 @@
-from app.schemas.encounter import EncounterCreate, EncounterRead
+from app.schemas.encounter import EncounterCreate, EncounterRead, EncounterUpdate
 from app.schemas.consent import (
     ConsentGrantCreate,
     ConsentCheckResponse,
@@ -13,10 +13,38 @@ from app.schemas.quorum import (
     QuorumVoteResponse,
     QuorumResponse,
 )
+from app.schemas.facility import (
+    FacilityResponse,
+    DepartmentResponse,
+    PractitionerResponse,
+    PatientFacilityRecordResponse,
+    TriageQueueItemResponse,
+    TriageEnqueueRequest,
+)
+from app.schemas.staging import (
+    StagingUploadResponse,
+    StagingPromoteRequest,
+    StagingRejectRequest,
+    StagingRecordRead,
+)
+from app.schemas.attachment import (
+    AttachmentRead,
+    PresignedUrlResponse,
+)
+from app.schemas.clinical import (
+    InteractionAlert,
+    InteractionCheckRequest,
+    InteractionCheckResponse,
+    ICD10Item,
+    AmendmentCreate,
+    TriageCalculateRequest,
+    TriageCalculateResponse,
+)
 
 __all__ = [
     "EncounterCreate",
     "EncounterRead",
+    "EncounterUpdate",
     "ConsentGrantCreate",
     "ConsentCheckResponse",
     "BreakGlassRequest",
@@ -28,5 +56,23 @@ __all__ = [
     "QuorumVoteRequest",
     "QuorumVoteResponse",
     "QuorumResponse",
+    "FacilityResponse",
+    "DepartmentResponse",
+    "PractitionerResponse",
+    "PatientFacilityRecordResponse",
+    "TriageQueueItemResponse",
+    "TriageEnqueueRequest",
+    "StagingUploadResponse",
+    "StagingPromoteRequest",
+    "StagingRejectRequest",
+    "StagingRecordRead",
+    "AttachmentRead",
+    "PresignedUrlResponse",
+    "InteractionAlert",
+    "InteractionCheckRequest",
+    "InteractionCheckResponse",
+    "ICD10Item",
+    "AmendmentCreate",
+    "TriageCalculateRequest",
+    "TriageCalculateResponse",
 ]
-

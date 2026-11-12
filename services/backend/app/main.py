@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.middleware import SecurityHeadersMiddleware
 from app.api.v1.router import router as v1_router
+from app.api.fhir.r4 import router as fhir_r4_router
 
 
 # ---------------------------------------------------------------------------
@@ -84,6 +85,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 # Routers
 # ---------------------------------------------------------------------------
 app.include_router(v1_router)
+app.include_router(fhir_r4_router)
 
 
 @app.get("/", tags=["Root"])

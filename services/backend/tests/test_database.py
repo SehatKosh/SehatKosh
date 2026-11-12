@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.database import get_db
-from app.core.security import log_audit_event, require_active_consent
+from app.core.security import require_active_consent
 from app.main import app
 from app.models.audit import AuditLog
 from app.models.base import Base

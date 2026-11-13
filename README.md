@@ -9,7 +9,7 @@ SehatKosh is a modern, high-performance, modular healthcare platform built as a 
 - **Monorepo Architecture**: Managed via **Turborepo** & **pnpm** workspaces for fast, cached builds and shared package linking (`@sehatkosh/types`, `@sehatkosh/mock-data`, `@sehatkosh/tailwind-config`).
 - **Frontend Applications**:
   - **Doctor Web Portal**: Next.js 14 (App Router), Tailwind CSS, Radix UI, TanStack React Query.
-  - **Patient Mobile App**: React Native (0.86), Expo SDK 57, Expo Router, NativeWind (Tailwind CSS).
+  - **Patient Mobile App**: React Native (0.88), Expo SDK 58, Expo Router, NativeWind (Tailwind CSS).
 - **Backend Service**:
   - **FastAPI Core**: Async Python 3.11+, Pydantic v2, PostgreSQL 16 (Relational DB), Neo4j 5 (Graph DB), LocalStack (S3 Object Storage).
 - **Modular Plug-and-Play Engines**:
@@ -25,7 +25,7 @@ SehatKosh is a modern, high-performance, modular healthcare platform built as a 
 SehatKosh/
 ├── apps/
 │   ├── doctor-web/           # Doctor Web Portal (Next.js 14, Tailwind CSS, Radix UI)
-│   └── mobile/               # Patient Mobile App (React Native, Expo SDK 57, NativeWind)
+│   └── mobile/               # Patient Mobile App (React Native, Expo SDK 58, NativeWind)
 ├── services/
 │   └── backend/              # Core FastAPI backend (Python 3.11+, Pytest, AsyncPG, Pydantic)
 │       ├── app/              # Application logic (API v1, Modules, Models, Core Dependencies)
@@ -57,7 +57,7 @@ Before getting started, make sure you have the following installed on your machi
 | **pnpm** | `v9.7.0` | `npm install -g pnpm@9.7.0` or `corepack enable` |
 | **Python** | `3.11+` | [python.org](https://python.org/) |
 | **Docker & Docker Compose** | Latest | [docker.com](https://www.docker.com/) |
-| **Expo Go** (Mobile testing) | SDK 57 Compatible | iOS App Store / Google Play Store |
+| **Expo Go** (Mobile testing) | SDK 58 Compatible | iOS App Store / Google Play Store |
 
 ---
 
@@ -68,7 +68,7 @@ Follow the setup steps tailored for your operating system:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/<your-org>/SehatKosh.git
+git clone https://github.com/SehatKosh/SehatKosh.git
 cd SehatKosh
 ```
 
@@ -177,7 +177,7 @@ cd services/backend
 ./.venv/bin/uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-#### C. Patient Mobile App (Expo SDK 57)
+#### C. Patient Mobile App (Expo SDK 58)
 ```bash
 pnpm dev:mobile
 ```
@@ -269,7 +269,7 @@ If another process is using required ports:
 If mobile styles or shared packages are not updating in Expo:
 ```bash
 cd apps/mobile
-npx expo start -c
+pnpm dev -c
 ```
 
 ### 3. Vercel Deployment Output Directory Error (`.next was not found at /vercel/path0/.next`)

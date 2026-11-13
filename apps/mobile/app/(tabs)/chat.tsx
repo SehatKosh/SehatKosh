@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   BackHandler,
   FlatList,
@@ -7,6 +8,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -68,6 +70,7 @@ const INITIAL_MESSAGES: ChatMessage[] = [
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const listRef = useRef<FlatList>(null);
+  const textInputRef = useRef<any>(null);
 
   // ── Server Health State ───────────────────────────────────────────────────
   const [health, setHealth] = useState<AviHealthResponse>({
@@ -76,15 +79,18 @@ export default function ChatScreen() {
   });
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
 
-  // ── Chat State ────────────────────────────────────────────────────────────
+  // ── Chat & Multimodal State ───────────────────────────────────────────────
   const [input, setInput] = useState("");
+  const inputRef = useRef("");
   const [messages, setMessages] = useState<ChatMessage[]>(INITIAL_MESSAGES);
   const [includeHealthProfile, setIncludeHealthProfile] = useState(true);
   const [selectedImage, setSelectedImage] = useState<PreparedImage | null>(null);
 
-  // ── Streaming & Thinking State ────────────────────────────────────────────
+  // ── Streaming State ───────────────────────────────────────────────────────
   const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingStage, setStreamingStage] = useState<"uploading" | "queued" | "generating">("queued");
+  const [streamingStage, setStreamingStage] = useState<
+    "uploading" | "queued" | "generating"
+  >("queued");
   const [requestStartTime, setRequestStartTime] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -113,7 +119,6 @@ export default function ChatScreen() {
   useEffect(() => {
     refreshHealth();
 
-    // Poll health every 4 seconds unless active streaming
     const interval = setInterval(() => {
       if (!isStreaming) {
         refreshHealth();
@@ -122,6 +127,49 @@ export default function ChatScreen() {
 
     return () => clearInterval(interval);
   }, [refreshHealth, isStreaming]);
+
+  // ── Stop Generation Handler ───────────────────────────────────────────────
+  const handleStopGeneration = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsStreaming(false);
+    setRequestStartTime(null);
+
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.isStreaming ? { ...msg, isStreaming: false } : msg
+      )
+    );
+  }, []);
+
+  // ── Hardware Back Button Handler (Android) ────────────────────────────────
+  useEffect(() => {
+    const handleHardwareBack = () => {
+      if (selectedImage) {
+        setSelectedImage(null);
+        return true;
+      }
+      if (isStreaming) {
+        handleStopGeneration();
+        return true;
+      }
+      if (router.canGoBack()) {
+        router.back();
+        return true;
+      }
+      router.replace("/(tabs)/activity");
+      return true;
+    };
+
+    const backSubscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      handleHardwareBack
+    );
+
+    return () => backSubscription.remove();
+  }, [selectedImage, isStreaming, handleStopGeneration]);
 
   // ── Image Attachment Handling ─────────────────────────────────────────────
   const pickImageFromGallery = async () => {
@@ -136,7 +184,10 @@ export default function ChatScreen() {
         setSelectedImage(prepared);
       }
     } catch (err: any) {
-      Alert.alert("Image Selection Failed", err.message || "Could not select photo.");
+      Alert.alert(
+        "Image Selection Failed",
+        err.message || "Could not select photo."
+      );
     }
   };
 
@@ -165,53 +216,14 @@ export default function ChatScreen() {
     }
   };
 
-  // ── Stop Generation Handler ───────────────────────────────────────────────
-  const handleStopGeneration = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    setIsStreaming(false);
-    setRequestStartTime(null);
-
-    // Finalize any streaming message
-    setMessages((prev) =>
-      prev.map((msg) => (msg.isStreaming ? { ...msg, isStreaming: false } : msg))
-    );
-  }, []);
-
-  // ── Hardware Back Button Handler ──────────────────────────────────────────
-  useEffect(() => {
-    const handleHardwareBack = () => {
-      if (selectedImage) {
-        setSelectedImage(null);
-        return true;
-      }
-      if (isStreaming) {
-        handleStopGeneration();
-        return true;
-      }
-      if (router.canGoBack()) {
-        router.back();
-        return true;
-      }
-      router.replace("/(tabs)/activity");
-      return true;
-    };
-
-    const backSubscription = BackHandler.addEventListener(
-      "hardwareBackPress",
-      handleHardwareBack
-    );
-
-    return () => backSubscription.remove();
-  }, [selectedImage, isStreaming, handleStopGeneration]);
-
   // ── Send Message Handler ──────────────────────────────────────────────────
   const handleSend = useCallback(
     async (textOverride?: string, imageOverride?: PreparedImage | null) => {
-      const userText = (typeof textOverride === "string" ? textOverride : input).trim();
-      const currentImage = imageOverride !== undefined ? imageOverride : selectedImage;
+      const userText = (
+        typeof textOverride === "string" ? textOverride : inputRef.current || input
+      ).trim();
+      const currentImage =
+        imageOverride !== undefined ? imageOverride : selectedImage;
 
       // Validate prompt & image
       const validation = validatePrompt(userText, !!currentImage);
@@ -224,7 +236,7 @@ export default function ChatScreen() {
       if (health.status === "unreachable") {
         Alert.alert(
           "Avi Server Offline",
-          "Cannot reach the MedGemma GPU server at the configured address. Please check your lab Wi-Fi or Tailscale connection in the server settings.",
+          "Cannot reach the MedGemma GPU server. Check lab Wi-Fi or Tailscale connection.",
           [
             { text: "Retry Check", onPress: refreshHealth },
             { text: "OK" },
@@ -248,14 +260,15 @@ export default function ChatScreen() {
         imageName: currentImage?.name,
       };
 
-      // Dismiss on-screen keyboard so response stream is in full view
-      Keyboard.dismiss();
-
-      // Reset input fields
+      // Clear input fields
+      inputRef.current = "";
       setInput("");
       setSelectedImage(null);
 
-      // Add user message to inverted list (at the top)
+      // Dismiss soft keyboard
+      Keyboard.dismiss();
+
+      // Add user message to inverted list
       setMessages((prev) => [userMessage, ...prev]);
 
       // Prepare clinical prompt
@@ -282,7 +295,7 @@ export default function ChatScreen() {
           onDelta: (chunk) => {
             if (!hasCreatedAssistantBubble) {
               hasCreatedAssistantBubble = true;
-              setRequestStartTime(null); // Dismiss thinking indicator once tokens arrive
+              setRequestStartTime(null);
 
               const newAssistantMsg: ChatMessage = {
                 id: assistantMsgId,
@@ -315,10 +328,10 @@ export default function ChatScreen() {
           prev.map((msg) =>
             msg.id === assistantMsgId
               ? {
-                ...msg,
-                isStreaming: false,
-                latencyMs: Date.now() - startTime,
-              }
+                  ...msg,
+                  isStreaming: false,
+                  latencyMs: Date.now() - startTime,
+                }
               : msg
           )
         );
@@ -330,7 +343,6 @@ export default function ChatScreen() {
         console.error("[ChatScreen] Avi streaming error:", err);
         lastFailedQueryRef.current = { prompt: userText, image: currentImage };
 
-        // Append error bubble
         const errorMsg: ChatMessage = {
           id: `err-${Date.now()}`,
           role: "error",
@@ -379,6 +391,7 @@ export default function ChatScreen() {
             handleStopGeneration();
             setMessages(INITIAL_MESSAGES);
             setSelectedImage(null);
+            inputRef.current = "";
             setInput("");
           },
         },
@@ -386,275 +399,527 @@ export default function ChatScreen() {
     );
   };
 
-  const topPadding = Math.max(insets.top, 16) + 4;
+  const handleTextChange = (text: string) => {
+    inputRef.current = text;
+    setInput(text);
+  };
+
+  const canSend = Boolean(input.trim() || selectedImage) && !isStreaming;
+  const topPadding = Math.max(insets.top, 16);
 
   return (
-    <KeyboardAvoidingView
-      className="flex-1 bg-slate-50"
-      style={{ paddingTop: topPadding }}
-      behavior="padding"
-      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-    >
-      {/* ── Main Top Bar ────────────────────────────────────────────── */}
-      <View className="border-b border-slate-200 bg-white px-4 pb-3 pt-2">
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center">
-            <TouchableOpacity
-              accessibilityLabel="Back to Activity"
-              onPress={() => {
-                if (router.canGoBack()) {
-                  router.back();
-                } else {
-                  router.replace("/(tabs)/activity");
-                }
-              }}
-              activeOpacity={0.7}
-              className="mr-2.5 h-9 w-9 items-center justify-center rounded-full bg-slate-100"
-            >
-              <ArrowLeft size={18} color="#475569" />
-            </TouchableOpacity>
-            <View className="mr-2.5 h-9 w-9 items-center justify-center rounded-xl bg-sky-600">
-              <Cpu size={20} color="#FFFFFF" />
-            </View>
-            <View>
-              <Text className="text-lg font-bold text-slate-900">
-                Avi Clinical Assistant
-              </Text>
-              <Text className="text-[11px] font-medium text-slate-500">
-                Google MedGemma 1.5 4B • Multimodal EMR
-              </Text>
-            </View>
+    <View style={[styles.rootContainer, { paddingTop: topPadding }]}>
+      {/* ── 1. Top Navigation Bar ───────────────────────────────────────── */}
+      <View style={styles.topBar}>
+        <View style={styles.topBarLeft}>
+          <TouchableOpacity
+            accessibilityLabel="Back to Activity"
+            onPress={() => {
+              if (router.canGoBack()) {
+                router.back();
+              } else {
+                router.replace("/(tabs)/activity");
+              }
+            }}
+            activeOpacity={0.7}
+            style={styles.backButton}
+          >
+            <ArrowLeft size={18} color="#475569" />
+          </TouchableOpacity>
+
+          <View style={styles.avatarIcon}>
+            <Cpu size={20} color="#FFFFFF" />
           </View>
 
-          <TouchableOpacity
-            accessibilityLabel="Reset conversation"
-            onPress={handleReset}
-            activeOpacity={0.7}
-            className="h-9 w-9 items-center justify-center rounded-full bg-slate-100"
-          >
-            <RotateCcw size={16} color="#475569" />
-          </TouchableOpacity>
+          <View>
+            <Text style={styles.titleText}>Avi Clinical Assistant</Text>
+            <Text style={styles.subtitleText}>
+              Google MedGemma 1.5 4B • Multimodal EMR
+            </Text>
+          </View>
         </View>
+
+        <TouchableOpacity
+          accessibilityLabel="Reset conversation"
+          onPress={handleReset}
+          activeOpacity={0.7}
+          style={styles.resetButton}
+        >
+          <RotateCcw size={16} color="#475569" />
+        </TouchableOpacity>
       </View>
 
-      {/* ── Live Health & Endpoint Header ────────────────────────────── */}
+      {/* ── 2. Live Server Health Status Header ─────────────────────────── */}
       <AviStatusHeader
         health={health}
         onRefreshHealth={refreshHealth}
         isChecking={isCheckingHealth}
       />
 
-      {/* ── Chat Feed ────────────────────────────────────────────────── */}
-      <FlatList
-        ref={listRef}
-        data={messages}
-        inverted
-        keyExtractor={(item) => item.id}
-        className="flex-1 px-4"
-        contentContainerStyle={{ paddingVertical: 16 }}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        ListHeaderComponent={
-          <>
-            {/* Thinking Indicator (Shown while waiting for first token) */}
-            {isStreaming && requestStartTime !== null && (
-              <ThinkingIndicator
-                stage={streamingStage}
-                hasImage={!!selectedImage}
-                startTime={requestStartTime}
-                onCancel={handleStopGeneration}
-              />
-            )}
+      {/* ── 3. Chat Feed & Composer in KeyboardAvoidingView ───────────────── */}
+      <KeyboardAvoidingView
+        style={styles.flexContainer}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
+      >
+        {/* Chat Messages List */}
+        <FlatList
+          ref={listRef}
+          data={messages}
+          inverted
+          keyExtractor={(item) => item.id}
+          style={styles.listStyle}
+          contentContainerStyle={styles.listContentStyle}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          ListHeaderComponent={
+            <>
+              {/* Thinking Indicator */}
+              {isStreaming && requestStartTime !== null && (
+                <ThinkingIndicator
+                  stage={streamingStage}
+                  hasImage={!!selectedImage}
+                  startTime={requestStartTime}
+                  onCancel={handleStopGeneration}
+                />
+              )}
 
-            {/* Starter Prompts */}
-            {messages.length === 1 && (
-              <View className="mb-4 mt-2 gap-2">
-                <Text className="text-xs font-semibold text-slate-500">
-                  Suggested Clinical Inquiries:
-                </Text>
-                {STARTER_PROMPTS.map((prompt) => (
-                  <TouchableOpacity
-                    key={prompt}
-                    onPress={() => handleSend(prompt)}
-                    activeOpacity={0.7}
-                    className="rounded-xl border border-sky-200 bg-sky-50/70 px-3.5 py-2.5"
-                  >
-                    <Text className="text-xs font-medium text-sky-800">
-                      {prompt}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </>
-        }
-        ListEmptyComponent={
-          <View className="items-center py-12">
-            <MessageSquarePlus size={32} color="#0284C7" />
-            <Text className="mt-3 text-center text-sm text-slate-500">
-              Ask a question or upload a prescription to begin.
+              {/* Starter Suggested Clinical Inquiries */}
+              {messages.length === 1 && (
+                <View style={styles.starterContainer}>
+                  <Text style={styles.starterHeading}>
+                    Suggested Clinical Inquiries:
+                  </Text>
+                  {STARTER_PROMPTS.map((prompt) => (
+                    <TouchableOpacity
+                      key={prompt}
+                      onPress={() => handleSend(prompt)}
+                      activeOpacity={0.7}
+                      style={styles.starterChip}
+                    >
+                      <Text style={styles.starterChipText}>{prompt}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </>
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <MessageSquarePlus size={32} color="#0284C7" />
+              <Text style={styles.emptyText}>
+                Ask a question or upload a prescription to begin.
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => (
+            <ChatMessageBubble message={item} onRetry={handleRetry} />
+          )}
+        />
+
+        {/* ── 4. Sticky Multimodal Composer ─────────────────────────────── */}
+        <View
+          style={[
+            styles.composerContainer,
+            { paddingBottom: Math.max(insets.bottom, 12) },
+          ]}
+        >
+          {/* Controls Bar: Context Toggle & Concurrency Pill */}
+          <View style={styles.controlsRow}>
+            <TouchableOpacity
+              onPress={() => setIncludeHealthProfile((prev) => !prev)}
+              activeOpacity={0.7}
+              style={[
+                styles.contextChip,
+                includeHealthProfile
+                  ? styles.contextChipActive
+                  : styles.contextChipInactive,
+              ]}
+            >
+              {includeHealthProfile ? (
+                <ShieldCheck size={13} color="#059669" />
+              ) : (
+                <Shield size={13} color="#64748B" />
+              )}
+              <Text
+                style={[
+                  styles.contextChipText,
+                  includeHealthProfile
+                    ? styles.contextTextActive
+                    : styles.contextTextInactive,
+                ]}
+              >
+                {includeHealthProfile
+                  ? "Health Passport Context: ON"
+                  : "Health Passport Context: OFF"}
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={styles.concurrencyText}>
+              Concurrency: 1 • VRAM Isolated
             </Text>
           </View>
-        }
-        renderItem={({ item }) => (
-          <ChatMessageBubble message={item} onRetry={handleRetry} />
-        )}
-      />
 
-      {/* ── Sticky Composer ────────────────────────────────────────── */}
-      <View
-        className="border-t border-slate-200 bg-white px-4 pt-2.5"
-        style={{ paddingBottom: Math.max(insets.bottom, 12) }}
-      >
-        {/* Controls Bar: Context Toggle & Image Status */}
-        <View className="mb-2 flex-row items-center justify-between">
-          {/* Grounded Context Toggle Chip */}
-          <TouchableOpacity
-            onPress={() => setIncludeHealthProfile((prev) => !prev)}
-            activeOpacity={0.7}
-            className={`flex-row items-center rounded-full border px-2.5 py-1 ${includeHealthProfile
-                ? "border-emerald-200 bg-emerald-50"
-                : "border-slate-200 bg-slate-100"
-              }`}
-          >
-            {includeHealthProfile ? (
-              <ShieldCheck size={13} color="#059669" />
-            ) : (
-              <Shield size={13} color="#64748B" />
-            )}
-            <Text
-              className={`ml-1 text-[11px] font-semibold ${includeHealthProfile ? "text-emerald-700" : "text-slate-600"
-                }`}
-            >
-              {includeHealthProfile
-                ? "Health Passport Context: ON"
-                : "Health Passport Context: OFF"}
-            </Text>
-          </TouchableOpacity>
-
-          <Text className="text-[10px] text-slate-400">
-            Concurrency: 1 • VRAM Isolated
-          </Text>
-        </View>
-
-        {/* Image Preview Strip (if photo attached) */}
-        {selectedImage && (
-          <View className="mb-2 flex-row items-center justify-between rounded-xl border border-sky-200 bg-sky-50 p-2">
-            <View className="flex-row items-center flex-1 mr-2">
-              <Image
-                source={{ uri: selectedImage.uri }}
-                className="h-10 w-10 rounded-lg bg-slate-200"
-                resizeMode="cover"
-              />
-              <View className="ml-2.5 flex-1">
-                <Text className="text-xs font-semibold text-slate-800" numberOfLines={1}>
-                  {selectedImage.name}
-                </Text>
-                <Text className="text-[10px] text-slate-500">
-                  {selectedImage.sizeBytes
-                    ? `${Math.round(selectedImage.sizeBytes / 1024)} KB • `
-                    : ""}
-                  Optimized JPEG (1024px)
-                </Text>
+          {/* Image Attachment Preview Strip */}
+          {selectedImage && (
+            <View style={styles.imagePreviewStrip}>
+              <View style={styles.imagePreviewLeft}>
+                <Image
+                  source={{ uri: selectedImage.uri }}
+                  style={styles.imageThumbnail}
+                  resizeMode="cover"
+                />
+                <View style={styles.imageInfo}>
+                  <Text style={styles.imageNameText} numberOfLines={1}>
+                    {selectedImage.name}
+                  </Text>
+                  <Text style={styles.imageSubText}>
+                    {selectedImage.sizeBytes
+                      ? `${Math.round(selectedImage.sizeBytes / 1024)} KB • `
+                      : ""}
+                    Optimized JPEG
+                  </Text>
+                </View>
               </View>
+
+              <TouchableOpacity
+                onPress={() => setSelectedImage(null)}
+                activeOpacity={0.7}
+                style={styles.imageRemoveButton}
+              >
+                <X size={14} color="#475569" />
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Multimodal Input Row */}
+          <View style={styles.inputRow}>
+            {/* Camera Button */}
+            <TouchableOpacity
+              onPress={takePhotoWithCamera}
+              accessibilityLabel="Scan Prescription with Camera"
+              disabled={isStreaming}
+              activeOpacity={0.7}
+              style={styles.mediaButton}
+            >
+              <Camera size={18} color="#475569" />
+            </TouchableOpacity>
+
+            {/* Gallery Button */}
+            <TouchableOpacity
+              onPress={pickImageFromGallery}
+              accessibilityLabel="Attach Photo from Gallery"
+              disabled={isStreaming}
+              activeOpacity={0.7}
+              style={styles.mediaButton}
+            >
+              <ImageIcon size={18} color="#475569" />
+            </TouchableOpacity>
+
+            {/* Controlled Text Input with explicit React Native styling */}
+            <View style={styles.textInputWrapper}>
+              <TextInput
+                ref={textInputRef}
+                value={input}
+                onChangeText={handleTextChange}
+                multiline
+                maxLength={800}
+                placeholder={
+                  selectedImage
+                    ? "Add notes or question for this image..."
+                    : "Ask Avi about medications, vitals, or symptoms..."
+                }
+                placeholderTextColor="#94A3B8"
+                style={styles.textInput}
+                editable={!isStreaming}
+                returnKeyType="send"
+                onSubmitEditing={() => {
+                  if (canSend) {
+                    handleSend();
+                  }
+                }}
+                blurOnSubmit={false}
+              />
             </View>
 
-            <TouchableOpacity
-              onPress={() => setSelectedImage(null)}
-              activeOpacity={0.7}
-              className="h-7 w-7 items-center justify-center rounded-full bg-slate-200"
-            >
-              <X size={14} color="#475569" />
-            </TouchableOpacity>
+            {/* Action Button: Dynamic Send or Stop */}
+            {isStreaming ? (
+              <TouchableOpacity
+                accessibilityLabel="Stop Generating"
+                onPress={handleStopGeneration}
+                activeOpacity={0.7}
+                style={[styles.actionButton, styles.stopButton]}
+              >
+                <Square size={16} color="#FFFFFF" fill="#FFFFFF" />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                accessibilityLabel="Send Inquiry"
+                onPress={() => {
+                  if (canSend) {
+                    handleSend();
+                  }
+                }}
+                disabled={!canSend}
+                activeOpacity={canSend ? 0.7 : 1}
+                style={[
+                  styles.actionButton,
+                  canSend ? styles.sendButtonActive : styles.sendButtonInactive,
+                ]}
+              >
+                <Send size={16} color={canSend ? "#FFFFFF" : "#94A3B8"} />
+              </TouchableOpacity>
+            )}
           </View>
-        )}
-
-        {/* Multimodal Input Row */}
-        <View className="flex-row items-end gap-1.5">
-          {/* Camera Button */}
-          <TouchableOpacity
-            onPress={takePhotoWithCamera}
-            accessibilityLabel="Scan Prescription with Camera"
-            disabled={isStreaming}
-            activeOpacity={0.7}
-            className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100"
-          >
-            <Camera size={18} color="#475569" />
-          </TouchableOpacity>
-
-          {/* Gallery Upload Button */}
-          <TouchableOpacity
-            onPress={pickImageFromGallery}
-            accessibilityLabel="Attach Photo from Gallery"
-            disabled={isStreaming}
-            activeOpacity={0.7}
-            className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100"
-          >
-            <ImageIcon size={18} color="#475569" />
-          </TouchableOpacity>
-
-          {/* Text Input */}
-          <View className="flex-1 max-h-[110px] rounded-xl bg-slate-100 px-3 py-2">
-            <TextInput
-              value={input}
-              onChangeText={setInput}
-              multiline
-              maxLength={800}
-              placeholder={
-                selectedImage
-                  ? "Add notes or question for this image..."
-                  : "Ask Avi about medications, vitals, or symptoms..."
-              }
-              placeholderTextColor="#94A3B8"
-              className="text-xs text-slate-900 leading-4"
-              style={{ minHeight: 20 }}
-              editable={!isStreaming}
-              returnKeyType="send"
-              onSubmitEditing={() => {
-                if ((input.trim() || selectedImage) && !isStreaming) {
-                  handleSend();
-                }
-              }}
-              blurOnSubmit={false}
-            />
-          </View>
-
-          {/* Dynamic Send / Stop Button */}
-          {isStreaming ? (
-            <TouchableOpacity
-              key="avi-stop-btn"
-              accessibilityLabel="Stop Generating"
-              onPress={handleStopGeneration}
-              activeOpacity={0.7}
-              className="h-10 w-10 items-center justify-center rounded-xl bg-rose-600 shadow-sm"
-              style={{ backgroundColor: "#E11D48" }}
-            >
-              <Square size={16} color="#FFFFFF" fill="#FFFFFF" />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity
-              key="avi-send-btn"
-              accessibilityLabel="Send Inquiry"
-              onPress={() => handleSend()}
-              disabled={(!input.trim() && !selectedImage) || isStreaming}
-              activeOpacity={0.7}
-              className={`h-10 w-10 items-center justify-center rounded-xl ${input.trim() || selectedImage
-                  ? "bg-sky-600 shadow-sm"
-                  : "bg-slate-200"
-                }`}
-              style={{
-                backgroundColor:
-                  input.trim() || selectedImage ? "#0284C7" : "#E2E8F0",
-              }}
-            >
-              <Send
-                size={16}
-                color={input.trim() || selectedImage ? "#FFFFFF" : "#94A3B8"}
-              />
-            </TouchableOpacity>
-          )}
         </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
+
+// ── Pure React Native Stylesheet (Immune to CSS Interop Cache Bugs) ───────────
+const styles = StyleSheet.create({
+  rootContainer: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+  },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+  },
+  topBarLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  avatarIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: "#0284C7",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 10,
+  },
+  titleText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#0F172A",
+  },
+  subtitleText: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: "#64748B",
+  },
+  resetButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  flexContainer: {
+    flex: 1,
+  },
+  listStyle: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  listContentStyle: {
+    paddingVertical: 16,
+  },
+  starterContainer: {
+    marginBottom: 16,
+    marginTop: 8,
+    gap: 8,
+  },
+  starterHeading: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+  },
+  starterChip: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+    backgroundColor: "rgba(240, 249, 255, 0.85)",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  starterChipText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: "#0369A1",
+    lineHeight: 18,
+  },
+  emptyContainer: {
+    alignItems: "center",
+    paddingVertical: 48,
+  },
+  emptyText: {
+    marginTop: 12,
+    textAlign: "center",
+    fontSize: 14,
+    color: "#64748B",
+  },
+  composerContainer: {
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+    paddingHorizontal: 16,
+    paddingTop: 10,
+  },
+  controlsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  contextChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 9999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  contextChipActive: {
+    borderColor: "#A7F3D0",
+    backgroundColor: "#ECFDF5",
+  },
+  contextChipInactive: {
+    borderColor: "#E2E8F0",
+    backgroundColor: "#F1F5F9",
+  },
+  contextChipText: {
+    marginLeft: 4,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  contextTextActive: {
+    color: "#047857",
+  },
+  contextTextInactive: {
+    color: "#475569",
+  },
+  concurrencyText: {
+    fontSize: 10,
+    color: "#94A3B8",
+  },
+  imagePreviewStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#BAE6FD",
+    backgroundColor: "#F0F9FF",
+    padding: 8,
+    marginBottom: 8,
+  },
+  imagePreviewLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: 8,
+  },
+  imageThumbnail: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: "#CBD5E1",
+  },
+  imageInfo: {
+    marginLeft: 10,
+    flex: 1,
+  },
+  imageNameText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#1E293B",
+  },
+  imageSubText: {
+    fontSize: 10,
+    color: "#64748B",
+  },
+  imageRemoveButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#E2E8F0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  inputRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 6,
+  },
+  mediaButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  textInputWrapper: {
+    flex: 1,
+    maxHeight: 110,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  textInput: {
+    fontSize: 13,
+    color: "#0F172A",
+    lineHeight: 18,
+    minHeight: 24,
+    paddingTop: 0,
+    paddingBottom: 0,
+  },
+  actionButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sendButtonActive: {
+    backgroundColor: "#0284C7",
+    shadowColor: "#0284C7",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  sendButtonInactive: {
+    backgroundColor: "#E2E8F0",
+  },
+  stopButton: {
+    backgroundColor: "#E11D48",
+    shadowColor: "#E11D48",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+});

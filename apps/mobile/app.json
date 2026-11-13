@@ -13,7 +13,8 @@
     "newArchEnabled": true,
     "android": {
       "package": "com.sehatkosh.app",
-      "usesCleartextTraffic": true
+      "usesCleartextTraffic": true,
+      "softwareKeyboardLayoutMode": "resize"
     },
     "ios": {
       "bundleIdentifier": "com.sehatkosh.app",

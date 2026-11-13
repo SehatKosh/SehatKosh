@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import {
   Image,
-  Pressable,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import {
@@ -102,17 +102,16 @@ export function ChatMessageBubble({ message, onRetry }: ChatMessageBubbleProps) 
           )}
 
           {onRetry && (
-            <Pressable
+            <TouchableOpacity
               onPress={() => onRetry(message)}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+              activeOpacity={0.7}
               className="mt-3 flex-row items-center self-start rounded-lg border border-rose-300 bg-white px-3 py-1.5"
             >
               <RefreshCw size={13} color="#BE123C" />
               <Text className="ml-1.5 text-xs font-semibold text-rose-800">
                 Retry Request
               </Text>
-            </Pressable>
+            </TouchableOpacity>
           )}
         </View>
 

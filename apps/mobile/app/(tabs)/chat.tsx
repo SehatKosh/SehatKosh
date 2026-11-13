@@ -1,19 +1,22 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
+  BackHandler,
   FlatList,
   Image,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   Text,
   TextInput,
+  TouchableOpacity,
   View,
 } from "react-native";
+import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import {
+  ArrowLeft,
   Camera,
   Cpu,
   Image as ImageIcon,
@@ -177,6 +180,33 @@ export default function ChatScreen() {
     );
   }, []);
 
+  // ── Hardware Back Button Handler ──────────────────────────────────────────
+  useEffect(() => {
+    const handleHardwareBack = () => {
+      if (selectedImage) {
+        setSelectedImage(null);
+        return true;
+      }
+      if (isStreaming) {
+        handleStopGeneration();
+        return true;
+      }
+      if (router.canGoBack()) {
+        router.back();
+        return true;
+      }
+      router.replace("/(tabs)/activity");
+      return true;
+    };
+
+    const backSubscription = BackHandler.addEventListener(
+      "hardwareBackPress",
+      handleHardwareBack
+    );
+
+    return () => backSubscription.remove();
+  }, [selectedImage, isStreaming, handleStopGeneration]);
+
   // ── Send Message Handler ──────────────────────────────────────────────────
   const handleSend = useCallback(
     async (textOverride?: string, imageOverride?: PreparedImage | null) => {
@@ -285,10 +315,10 @@ export default function ChatScreen() {
           prev.map((msg) =>
             msg.id === assistantMsgId
               ? {
-                  ...msg,
-                  isStreaming: false,
-                  latencyMs: Date.now() - startTime,
-                }
+                ...msg,
+                isStreaming: false,
+                latencyMs: Date.now() - startTime,
+              }
               : msg
           )
         );
@@ -362,13 +392,27 @@ export default function ChatScreen() {
     <KeyboardAvoidingView
       className="flex-1 bg-slate-50"
       style={{ paddingTop: topPadding }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior="padding"
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
     >
       {/* ── Main Top Bar ────────────────────────────────────────────── */}
       <View className="border-b border-slate-200 bg-white px-4 pb-3 pt-2">
         <View className="flex-row items-center justify-between">
           <View className="flex-row items-center">
+            <TouchableOpacity
+              accessibilityLabel="Back to Activity"
+              onPress={() => {
+                if (router.canGoBack()) {
+                  router.back();
+                } else {
+                  router.replace("/(tabs)/activity");
+                }
+              }}
+              activeOpacity={0.7}
+              className="mr-2.5 h-9 w-9 items-center justify-center rounded-full bg-slate-100"
+            >
+              <ArrowLeft size={18} color="#475569" />
+            </TouchableOpacity>
             <View className="mr-2.5 h-9 w-9 items-center justify-center rounded-xl bg-sky-600">
               <Cpu size={20} color="#FFFFFF" />
             </View>
@@ -382,15 +426,14 @@ export default function ChatScreen() {
             </View>
           </View>
 
-          <Pressable
+          <TouchableOpacity
             accessibilityLabel="Reset conversation"
             onPress={handleReset}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+            activeOpacity={0.7}
             className="h-9 w-9 items-center justify-center rounded-full bg-slate-100"
           >
             <RotateCcw size={16} color="#475569" />
-          </Pressable>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -430,17 +473,16 @@ export default function ChatScreen() {
                   Suggested Clinical Inquiries:
                 </Text>
                 {STARTER_PROMPTS.map((prompt) => (
-                  <Pressable
+                  <TouchableOpacity
                     key={prompt}
                     onPress={() => handleSend(prompt)}
-                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                    style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+                    activeOpacity={0.7}
                     className="rounded-xl border border-sky-200 bg-sky-50/70 px-3.5 py-2.5"
                   >
                     <Text className="text-xs font-medium text-sky-800">
                       {prompt}
                     </Text>
-                  </Pressable>
+                  </TouchableOpacity>
                 ))}
               </View>
             )}
@@ -467,15 +509,13 @@ export default function ChatScreen() {
         {/* Controls Bar: Context Toggle & Image Status */}
         <View className="mb-2 flex-row items-center justify-between">
           {/* Grounded Context Toggle Chip */}
-          <Pressable
+          <TouchableOpacity
             onPress={() => setIncludeHealthProfile((prev) => !prev)}
-            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-            style={({ pressed }) => [{ opacity: pressed ? 0.75 : 1 }]}
-            className={`flex-row items-center rounded-full border px-2.5 py-1 ${
-              includeHealthProfile
+            activeOpacity={0.7}
+            className={`flex-row items-center rounded-full border px-2.5 py-1 ${includeHealthProfile
                 ? "border-emerald-200 bg-emerald-50"
                 : "border-slate-200 bg-slate-100"
-            }`}
+              }`}
           >
             {includeHealthProfile ? (
               <ShieldCheck size={13} color="#059669" />
@@ -483,15 +523,14 @@ export default function ChatScreen() {
               <Shield size={13} color="#64748B" />
             )}
             <Text
-              className={`ml-1 text-[11px] font-semibold ${
-                includeHealthProfile ? "text-emerald-700" : "text-slate-600"
-              }`}
+              className={`ml-1 text-[11px] font-semibold ${includeHealthProfile ? "text-emerald-700" : "text-slate-600"
+                }`}
             >
               {includeHealthProfile
                 ? "Health Passport Context: ON"
                 : "Health Passport Context: OFF"}
             </Text>
-          </Pressable>
+          </TouchableOpacity>
 
           <Text className="text-[10px] text-slate-400">
             Concurrency: 1 • VRAM Isolated
@@ -520,46 +559,39 @@ export default function ChatScreen() {
               </View>
             </View>
 
-            <Pressable
+            <TouchableOpacity
               onPress={() => setSelectedImage(null)}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+              activeOpacity={0.7}
               className="h-7 w-7 items-center justify-center rounded-full bg-slate-200"
             >
               <X size={14} color="#475569" />
-            </Pressable>
+            </TouchableOpacity>
           </View>
         )}
 
         {/* Multimodal Input Row */}
         <View className="flex-row items-end gap-1.5">
           {/* Camera Button */}
-          <Pressable
+          <TouchableOpacity
             onPress={takePhotoWithCamera}
             accessibilityLabel="Scan Prescription with Camera"
             disabled={isStreaming}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={({ pressed }) => [
-              { opacity: pressed && !isStreaming ? 0.7 : 1 },
-            ]}
+            activeOpacity={0.7}
             className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100"
           >
             <Camera size={18} color="#475569" />
-          </Pressable>
+          </TouchableOpacity>
 
           {/* Gallery Upload Button */}
-          <Pressable
+          <TouchableOpacity
             onPress={pickImageFromGallery}
             accessibilityLabel="Attach Photo from Gallery"
             disabled={isStreaming}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            style={({ pressed }) => [
-              { opacity: pressed && !isStreaming ? 0.7 : 1 },
-            ]}
+            activeOpacity={0.7}
             className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100"
           >
             <ImageIcon size={18} color="#475569" />
-          </Pressable>
+          </TouchableOpacity>
 
           {/* Text Input */}
           <View className="flex-1 max-h-[110px] rounded-xl bg-slate-100 px-3 py-2">
@@ -589,42 +621,37 @@ export default function ChatScreen() {
 
           {/* Dynamic Send / Stop Button */}
           {isStreaming ? (
-            <Pressable
+            <TouchableOpacity
               key="avi-stop-btn"
               accessibilityLabel="Stop Generating"
               onPress={handleStopGeneration}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+              activeOpacity={0.7}
               className="h-10 w-10 items-center justify-center rounded-xl bg-rose-600 shadow-sm"
+              style={{ backgroundColor: "#E11D48" }}
             >
               <Square size={16} color="#FFFFFF" fill="#FFFFFF" />
-            </Pressable>
+            </TouchableOpacity>
           ) : (
-            <Pressable
+            <TouchableOpacity
               key="avi-send-btn"
               accessibilityLabel="Send Inquiry"
               onPress={() => handleSend()}
               disabled={(!input.trim() && !selectedImage) || isStreaming}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={({ pressed }) => [
-                {
-                  opacity:
-                    pressed && (input.trim() || selectedImage) && !isStreaming
-                      ? 0.75
-                      : 1,
-                },
-              ]}
-              className={`h-10 w-10 items-center justify-center rounded-xl ${
-                input.trim() || selectedImage
+              activeOpacity={0.7}
+              className={`h-10 w-10 items-center justify-center rounded-xl ${input.trim() || selectedImage
                   ? "bg-sky-600 shadow-sm"
                   : "bg-slate-200"
-              }`}
+                }`}
+              style={{
+                backgroundColor:
+                  input.trim() || selectedImage ? "#0284C7" : "#E2E8F0",
+              }}
             >
               <Send
                 size={16}
                 color={input.trim() || selectedImage ? "#FFFFFF" : "#94A3B8"}
               />
-            </Pressable>
+            </TouchableOpacity>
           )}
         </View>
       </View>

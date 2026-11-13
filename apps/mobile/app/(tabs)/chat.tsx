@@ -3,11 +3,12 @@ import {
   Alert,
   FlatList,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -217,6 +218,9 @@ export default function ChatScreen() {
         imageName: currentImage?.name,
       };
 
+      // Dismiss on-screen keyboard so response stream is in full view
+      Keyboard.dismiss();
+
       // Reset input fields
       setInput("");
       setSelectedImage(null);
@@ -355,7 +359,12 @@ export default function ChatScreen() {
   const topPadding = Math.max(insets.top, 16) + 4;
 
   return (
-    <View className="flex-1 bg-slate-50" style={{ paddingTop: topPadding }}>
+    <KeyboardAvoidingView
+      className="flex-1 bg-slate-50"
+      style={{ paddingTop: topPadding }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+    >
       {/* ── Main Top Bar ────────────────────────────────────────────── */}
       <View className="border-b border-slate-200 bg-white px-4 pb-3 pt-2">
         <View className="flex-row items-center justify-between">
@@ -373,13 +382,15 @@ export default function ChatScreen() {
             </View>
           </View>
 
-          <TouchableOpacity
+          <Pressable
             accessibilityLabel="Reset conversation"
             onPress={handleReset}
-            className="h-9 w-9 items-center justify-center rounded-full bg-slate-100 active:bg-slate-200"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+            className="h-9 w-9 items-center justify-center rounded-full bg-slate-100"
           >
             <RotateCcw size={16} color="#475569" />
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
 
@@ -390,205 +401,233 @@ export default function ChatScreen() {
         isChecking={isCheckingHealth}
       />
 
-      {/* ── Chat Feed & Composer ─────────────────────────────────────── */}
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={0}
-      >
-        <FlatList
-          ref={listRef}
-          data={messages}
-          inverted
-          keyExtractor={(item) => item.id}
-          className="flex-1 px-4"
-          contentContainerStyle={{ paddingVertical: 16 }}
-          ListHeaderComponent={
-            <>
-              {/* Thinking Indicator (Shown while waiting for first token) */}
-              {isStreaming && requestStartTime !== null && (
-                <ThinkingIndicator
-                  stage={streamingStage}
-                  hasImage={!!selectedImage}
-                  startTime={requestStartTime}
-                  onCancel={handleStopGeneration}
-                />
-              )}
+      {/* ── Chat Feed ────────────────────────────────────────────────── */}
+      <FlatList
+        ref={listRef}
+        data={messages}
+        inverted
+        keyExtractor={(item) => item.id}
+        className="flex-1 px-4"
+        contentContainerStyle={{ paddingVertical: 16 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        ListHeaderComponent={
+          <>
+            {/* Thinking Indicator (Shown while waiting for first token) */}
+            {isStreaming && requestStartTime !== null && (
+              <ThinkingIndicator
+                stage={streamingStage}
+                hasImage={!!selectedImage}
+                startTime={requestStartTime}
+                onCancel={handleStopGeneration}
+              />
+            )}
 
-              {/* Starter Prompts */}
-              {messages.length === 1 && (
-                <View className="mb-4 mt-2 gap-2">
-                  <Text className="text-xs font-semibold text-slate-500">
-                    Suggested Clinical Inquiries:
-                  </Text>
-                  {STARTER_PROMPTS.map((prompt) => (
-                    <TouchableOpacity
-                      key={prompt}
-                      onPress={() => handleSend(prompt)}
-                      className="rounded-xl border border-sky-200 bg-sky-50/70 px-3.5 py-2.5 active:bg-sky-100"
-                    >
-                      <Text className="text-xs font-medium text-sky-800">
-                        {prompt}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </>
-          }
-          ListEmptyComponent={
-            <View className="items-center py-12">
-              <MessageSquarePlus size={32} color="#0284C7" />
-              <Text className="mt-3 text-center text-sm text-slate-500">
-                Ask a question or upload a prescription to begin.
-              </Text>
-            </View>
-          }
-          renderItem={({ item }) => (
-            <ChatMessageBubble message={item} onRetry={handleRetry} />
-          )}
-        />
-
-        {/* ── Sticky Composer ────────────────────────────────────────── */}
-        <View className="border-t border-slate-200 bg-white px-4 pt-2.5 pb-3">
-          {/* Controls Bar: Context Toggle & Image Status */}
-          <View className="mb-2 flex-row items-center justify-between">
-            {/* Grounded Context Toggle Chip */}
-            <TouchableOpacity
-              onPress={() => setIncludeHealthProfile((prev) => !prev)}
-              activeOpacity={0.7}
-              className={`flex-row items-center rounded-full border px-2.5 py-1 ${
-                includeHealthProfile
-                  ? "border-emerald-200 bg-emerald-50"
-                  : "border-slate-200 bg-slate-100"
-              }`}
-            >
-              {includeHealthProfile ? (
-                <ShieldCheck size={13} color="#059669" />
-              ) : (
-                <Shield size={13} color="#64748B" />
-              )}
-              <Text
-                className={`ml-1 text-[11px] font-semibold ${
-                  includeHealthProfile ? "text-emerald-700" : "text-slate-600"
-                }`}
-              >
-                {includeHealthProfile
-                  ? "Health Passport Context: ON"
-                  : "Health Passport Context: OFF"}
-              </Text>
-            </TouchableOpacity>
-
-            <Text className="text-[10px] text-slate-400">
-              Concurrency: 1 • VRAM Isolated
+            {/* Starter Prompts */}
+            {messages.length === 1 && (
+              <View className="mb-4 mt-2 gap-2">
+                <Text className="text-xs font-semibold text-slate-500">
+                  Suggested Clinical Inquiries:
+                </Text>
+                {STARTER_PROMPTS.map((prompt) => (
+                  <Pressable
+                    key={prompt}
+                    onPress={() => handleSend(prompt)}
+                    hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                    style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+                    className="rounded-xl border border-sky-200 bg-sky-50/70 px-3.5 py-2.5"
+                  >
+                    <Text className="text-xs font-medium text-sky-800">
+                      {prompt}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </>
+        }
+        ListEmptyComponent={
+          <View className="items-center py-12">
+            <MessageSquarePlus size={32} color="#0284C7" />
+            <Text className="mt-3 text-center text-sm text-slate-500">
+              Ask a question or upload a prescription to begin.
             </Text>
           </View>
+        }
+        renderItem={({ item }) => (
+          <ChatMessageBubble message={item} onRetry={handleRetry} />
+        )}
+      />
 
-          {/* Image Preview Strip (if photo attached) */}
-          {selectedImage && (
-            <View className="mb-2 flex-row items-center justify-between rounded-xl border border-sky-200 bg-sky-50 p-2">
-              <View className="flex-row items-center flex-1 mr-2">
-                <Image
-                  source={{ uri: selectedImage.uri }}
-                  className="h-10 w-10 rounded-lg bg-slate-200"
-                  resizeMode="cover"
-                />
-                <View className="ml-2.5 flex-1">
-                  <Text className="text-xs font-semibold text-slate-800" numberOfLines={1}>
-                    {selectedImage.name}
-                  </Text>
-                  <Text className="text-[10px] text-slate-500">
-                    {selectedImage.sizeBytes
-                      ? `${Math.round(selectedImage.sizeBytes / 1024)} KB • `
-                      : ""}
-                    Optimized JPEG (1024px)
-                  </Text>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => setSelectedImage(null)}
-                className="h-7 w-7 items-center justify-center rounded-full bg-slate-200 active:bg-slate-300"
-              >
-                <X size={14} color="#475569" />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Multimodal Input Row */}
-          <View className="flex-row items-end gap-1.5">
-            {/* Camera Button */}
-            <TouchableOpacity
-              onPress={takePhotoWithCamera}
-              accessibilityLabel="Scan Prescription with Camera"
-              disabled={isStreaming}
-              className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100 active:bg-slate-200"
-            >
-              <Camera size={18} color="#475569" />
-            </TouchableOpacity>
-
-            {/* Gallery Upload Button */}
-            <TouchableOpacity
-              onPress={pickImageFromGallery}
-              accessibilityLabel="Attach Photo from Gallery"
-              disabled={isStreaming}
-              className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100 active:bg-slate-200"
-            >
-              <ImageIcon size={18} color="#475569" />
-            </TouchableOpacity>
-
-            {/* Text Input */}
-            <View className="flex-1 max-h-[110px] rounded-xl bg-slate-100 px-3 py-2">
-              <TextInput
-                value={input}
-                onChangeText={setInput}
-                multiline
-                maxLength={800}
-                placeholder={
-                  selectedImage
-                    ? "Add notes or question for this image..."
-                    : "Ask Avi about medications, vitals, or symptoms..."
-                }
-                placeholderTextColor="#94A3B8"
-                className="text-xs text-slate-900 leading-4"
-                style={{ minHeight: 20 }}
-                editable={!isStreaming}
-              />
-            </View>
-
-            {/* Dynamic Send / Stop Button */}
-            {isStreaming ? (
-              <TouchableOpacity
-                key="avi-stop-btn"
-                activeOpacity={0.8}
-                accessibilityLabel="Stop Generating"
-                onPress={handleStopGeneration}
-                className="h-10 w-10 items-center justify-center rounded-xl bg-rose-600 shadow-sm"
-              >
-                <Square size={16} color="#FFFFFF" fill="#FFFFFF" />
-              </TouchableOpacity>
+      {/* ── Sticky Composer ────────────────────────────────────────── */}
+      <View
+        className="border-t border-slate-200 bg-white px-4 pt-2.5"
+        style={{ paddingBottom: Math.max(insets.bottom, 12) }}
+      >
+        {/* Controls Bar: Context Toggle & Image Status */}
+        <View className="mb-2 flex-row items-center justify-between">
+          {/* Grounded Context Toggle Chip */}
+          <Pressable
+            onPress={() => setIncludeHealthProfile((prev) => !prev)}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            style={({ pressed }) => [{ opacity: pressed ? 0.75 : 1 }]}
+            className={`flex-row items-center rounded-full border px-2.5 py-1 ${
+              includeHealthProfile
+                ? "border-emerald-200 bg-emerald-50"
+                : "border-slate-200 bg-slate-100"
+            }`}
+          >
+            {includeHealthProfile ? (
+              <ShieldCheck size={13} color="#059669" />
             ) : (
-              <TouchableOpacity
-                key="avi-send-btn"
-                activeOpacity={0.8}
-                accessibilityLabel="Send Inquiry"
-                onPress={() => handleSend()}
-                disabled={!input.trim() && !selectedImage}
-                className={`h-10 w-10 items-center justify-center rounded-xl ${
-                  input.trim() || selectedImage
-                    ? "bg-sky-600 shadow-sm"
-                    : "bg-slate-200"
-                }`}
-              >
-                <Send
-                  size={16}
-                  color={input.trim() || selectedImage ? "#FFFFFF" : "#94A3B8"}
-                />
-              </TouchableOpacity>
+              <Shield size={13} color="#64748B" />
             )}
-          </View>
+            <Text
+              className={`ml-1 text-[11px] font-semibold ${
+                includeHealthProfile ? "text-emerald-700" : "text-slate-600"
+              }`}
+            >
+              {includeHealthProfile
+                ? "Health Passport Context: ON"
+                : "Health Passport Context: OFF"}
+            </Text>
+          </Pressable>
+
+          <Text className="text-[10px] text-slate-400">
+            Concurrency: 1 • VRAM Isolated
+          </Text>
         </View>
-      </KeyboardAvoidingView>
-    </View>
+
+        {/* Image Preview Strip (if photo attached) */}
+        {selectedImage && (
+          <View className="mb-2 flex-row items-center justify-between rounded-xl border border-sky-200 bg-sky-50 p-2">
+            <View className="flex-row items-center flex-1 mr-2">
+              <Image
+                source={{ uri: selectedImage.uri }}
+                className="h-10 w-10 rounded-lg bg-slate-200"
+                resizeMode="cover"
+              />
+              <View className="ml-2.5 flex-1">
+                <Text className="text-xs font-semibold text-slate-800" numberOfLines={1}>
+                  {selectedImage.name}
+                </Text>
+                <Text className="text-[10px] text-slate-500">
+                  {selectedImage.sizeBytes
+                    ? `${Math.round(selectedImage.sizeBytes / 1024)} KB • `
+                    : ""}
+                  Optimized JPEG (1024px)
+                </Text>
+              </View>
+            </View>
+
+            <Pressable
+              onPress={() => setSelectedImage(null)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+              className="h-7 w-7 items-center justify-center rounded-full bg-slate-200"
+            >
+              <X size={14} color="#475569" />
+            </Pressable>
+          </View>
+        )}
+
+        {/* Multimodal Input Row */}
+        <View className="flex-row items-end gap-1.5">
+          {/* Camera Button */}
+          <Pressable
+            onPress={takePhotoWithCamera}
+            accessibilityLabel="Scan Prescription with Camera"
+            disabled={isStreaming}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={({ pressed }) => [
+              { opacity: pressed && !isStreaming ? 0.7 : 1 },
+            ]}
+            className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100"
+          >
+            <Camera size={18} color="#475569" />
+          </Pressable>
+
+          {/* Gallery Upload Button */}
+          <Pressable
+            onPress={pickImageFromGallery}
+            accessibilityLabel="Attach Photo from Gallery"
+            disabled={isStreaming}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={({ pressed }) => [
+              { opacity: pressed && !isStreaming ? 0.7 : 1 },
+            ]}
+            className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100"
+          >
+            <ImageIcon size={18} color="#475569" />
+          </Pressable>
+
+          {/* Text Input */}
+          <View className="flex-1 max-h-[110px] rounded-xl bg-slate-100 px-3 py-2">
+            <TextInput
+              value={input}
+              onChangeText={setInput}
+              multiline
+              maxLength={800}
+              placeholder={
+                selectedImage
+                  ? "Add notes or question for this image..."
+                  : "Ask Avi about medications, vitals, or symptoms..."
+              }
+              placeholderTextColor="#94A3B8"
+              className="text-xs text-slate-900 leading-4"
+              style={{ minHeight: 20 }}
+              editable={!isStreaming}
+              returnKeyType="send"
+              onSubmitEditing={() => {
+                if ((input.trim() || selectedImage) && !isStreaming) {
+                  handleSend();
+                }
+              }}
+              blurOnSubmit={false}
+            />
+          </View>
+
+          {/* Dynamic Send / Stop Button */}
+          {isStreaming ? (
+            <Pressable
+              key="avi-stop-btn"
+              accessibilityLabel="Stop Generating"
+              onPress={handleStopGeneration}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
+              className="h-10 w-10 items-center justify-center rounded-xl bg-rose-600 shadow-sm"
+            >
+              <Square size={16} color="#FFFFFF" fill="#FFFFFF" />
+            </Pressable>
+          ) : (
+            <Pressable
+              key="avi-send-btn"
+              accessibilityLabel="Send Inquiry"
+              onPress={() => handleSend()}
+              disabled={(!input.trim() && !selectedImage) || isStreaming}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={({ pressed }) => [
+                {
+                  opacity:
+                    pressed && (input.trim() || selectedImage) && !isStreaming
+                      ? 0.75
+                      : 1,
+                },
+              ]}
+              className={`h-10 w-10 items-center justify-center rounded-xl ${
+                input.trim() || selectedImage
+                  ? "bg-sky-600 shadow-sm"
+                  : "bg-slate-200"
+              }`}
+            >
+              <Send
+                size={16}
+                color={input.trim() || selectedImage ? "#FFFFFF" : "#94A3B8"}
+              />
+            </Pressable>
+          )}
+        </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }

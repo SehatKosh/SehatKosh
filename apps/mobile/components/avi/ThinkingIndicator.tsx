@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Pressable, Text, View } from "react-native";
 import { Cpu, Square } from "lucide-react-native";
 
 interface ThinkingIndicatorProps {
@@ -60,16 +60,17 @@ export function ThinkingIndicator({
         </View>
 
         {onCancel && (
-          <TouchableOpacity
+          <Pressable
             onPress={onCancel}
-            activeOpacity={0.7}
-            className="flex-row items-center rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 active:bg-rose-100"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+            className="flex-row items-center rounded-lg border border-rose-200 bg-rose-50 px-2 py-1"
           >
             <Square size={10} color="#E11D48" fill="#E11D48" />
             <Text className="ml-1 text-[11px] font-semibold text-rose-700">
               Stop
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         )}
       </View>
 

@@ -12,10 +12,17 @@
     "orientation": "portrait",
     "newArchEnabled": true,
     "android": {
-      "package": "com.sehatkosh.app"
+      "package": "com.sehatkosh.app",
+      "usesCleartextTraffic": true,
+      "softwareKeyboardLayoutMode": "resize"
     },
     "ios": {
-      "bundleIdentifier": "com.sehatkosh.app"
+      "bundleIdentifier": "com.sehatkosh.app",
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
     },
     "plugins": [
       "expo-router",

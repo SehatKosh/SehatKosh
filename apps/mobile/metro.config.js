@@ -29,9 +29,6 @@ config.resolver.sourceExts = [
   "mjs",
 ];
 
-// ─── Disable package exports (fixes pnpm symlink resolution) ─────────────────
-config.resolver.unstable_enablePackageExports = false;
-
 // ─── Store cache inside the project (avoids stale monorepo-root cache) ───────
 config.cacheStores = [
   new FileStore({ root: path.join(projectRoot, ".metro-cache") }),

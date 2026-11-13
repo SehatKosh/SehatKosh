@@ -8,14 +8,26 @@ export const DEFAULT_AVI_URL =
 
 // ─── Endpoint Configuration ──────────────────────────────────────────────────
 
+let cachedCustomUrl: string | null = null;
+let customUrlLoaded = false;
+
 export async function getAviBaseUrl(): Promise<string> {
+  if (customUrlLoaded && cachedCustomUrl !== null) {
+    return cachedCustomUrl;
+  }
   try {
     const custom = await AsyncStorage.getItem(AVI_STORAGE_KEY);
     if (custom && custom.trim().length > 0) {
-      return custom.trim().replace(/\/+$/, "");
+      cachedCustomUrl = custom.trim().replace(/\/+$/, "");
+      customUrlLoaded = true;
+      return cachedCustomUrl;
     }
+    customUrlLoaded = true;
   } catch (err) {
-    console.warn("[AviClient] Failed to load custom URL from storage:", err);
+    if (!customUrlLoaded) {
+      console.warn("[AviClient] Failed to load custom URL from storage:", err);
+      customUrlLoaded = true;
+    }
   }
   return DEFAULT_AVI_URL.replace(/\/+$/, "");
 }
@@ -26,12 +38,24 @@ export async function setAviBaseUrl(rawUrl: string): Promise<string> {
     url = `http://${url}`;
   }
   url = url.replace(/\/+$/, "");
-  await AsyncStorage.setItem(AVI_STORAGE_KEY, url);
+  cachedCustomUrl = url;
+  customUrlLoaded = true;
+  try {
+    await AsyncStorage.setItem(AVI_STORAGE_KEY, url);
+  } catch (err) {
+    console.warn("[AviClient] Failed to persist custom URL to storage:", err);
+  }
   return url;
 }
 
 export async function resetAviBaseUrl(): Promise<string> {
-  await AsyncStorage.removeItem(AVI_STORAGE_KEY);
+  cachedCustomUrl = null;
+  customUrlLoaded = true;
+  try {
+    await AsyncStorage.removeItem(AVI_STORAGE_KEY);
+  } catch (err) {
+    console.warn("[AviClient] Failed to reset custom URL in storage:", err);
+  }
   return DEFAULT_AVI_URL.replace(/\/+$/, "");
 }
 

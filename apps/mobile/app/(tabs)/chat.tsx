@@ -559,20 +559,24 @@ export default function ChatScreen() {
             {/* Dynamic Send / Stop Button */}
             {isStreaming ? (
               <TouchableOpacity
+                key="avi-stop-btn"
+                activeOpacity={0.8}
                 accessibilityLabel="Stop Generating"
                 onPress={handleStopGeneration}
-                className="h-10 w-10 items-center justify-center rounded-xl bg-rose-600 active:bg-rose-700 shadow-sm"
+                className="h-10 w-10 items-center justify-center rounded-xl bg-rose-600 shadow-sm"
               >
                 <Square size={16} color="#FFFFFF" fill="#FFFFFF" />
               </TouchableOpacity>
             ) : (
               <TouchableOpacity
+                key="avi-send-btn"
+                activeOpacity={0.8}
                 accessibilityLabel="Send Inquiry"
                 onPress={() => handleSend()}
                 disabled={!input.trim() && !selectedImage}
                 className={`h-10 w-10 items-center justify-center rounded-xl ${
                   input.trim() || selectedImage
-                    ? "bg-sky-600 active:bg-sky-700 shadow-sm"
+                    ? "bg-sky-600 shadow-sm"
                     : "bg-slate-200"
                 }`}
               >

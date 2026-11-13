@@ -29,22 +29,6 @@ config.resolver.sourceExts = [
   "mjs",
 ];
 
-// ─── Custom module resolution hook for Expo SDK 58 & monorepo compatibility ───
-const originalResolveRequest = config.resolver.resolveRequest;
-config.resolver.resolveRequest = (context, moduleName, platform) => {
-  if (moduleName === "@expo/log-box/LogBox") {
-    try {
-      return context.resolveRequest(context, "@expo/log-box/build/LogBox", platform);
-    } catch (e) {
-      // Fallback to original resolver if build path fails
-    }
-  }
-  if (originalResolveRequest) {
-    return originalResolveRequest(context, moduleName, platform);
-  }
-  return context.resolveRequest(context, moduleName, platform);
-};
-
 // ─── Store cache inside the project (avoids stale monorepo-root cache) ───────
 config.cacheStores = [
   new FileStore({ root: path.join(projectRoot, ".metro-cache") }),

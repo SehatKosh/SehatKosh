@@ -1,4 +1,15 @@
 import "react-native-gesture-handler";
+import {
+  configureReanimatedLogger,
+  ReanimatedLogLevel,
+} from "react-native-reanimated";
+
+// Disable strict mode warnings from 3rd-party libs like @gorhom/bottom-sheet
+configureReanimatedLogger({
+  level: ReanimatedLogLevel.warn,
+  strict: false,
+});
+
 // @ts-ignore
 import "../global.css";
 import { Stack } from "expo-router";

@@ -157,7 +157,8 @@ export function AviStatusHeader({
         <TouchableOpacity
           onPress={onRefreshHealth}
           disabled={isChecking}
-          className="flex-row items-center rounded-lg bg-slate-100 px-2.5 py-1.5 active:bg-slate-200"
+          activeOpacity={0.7}
+          className="flex-row items-center rounded-lg bg-slate-100 px-2.5 py-1.5"
         >
           {isChecking ? (
             <ActivityIndicator size="small" color="#0284C7" />
@@ -261,7 +262,8 @@ export function AviStatusHeader({
               <TouchableOpacity
                 onPress={handleTestConnection}
                 disabled={testing}
-                className="flex-row items-center justify-center rounded-xl border border-sky-600 bg-sky-50 py-2.5 active:bg-sky-100"
+                activeOpacity={0.7}
+                className="flex-row items-center justify-center rounded-xl border border-sky-600 bg-sky-50 py-2.5"
               >
                 {testing ? (
                   <ActivityIndicator size="small" color="#0284C7" />
@@ -276,7 +278,8 @@ export function AviStatusHeader({
                 <TouchableOpacity
                   onPress={handleResetDefault}
                   disabled={saving}
-                  className="flex-1 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 py-2.5 active:bg-slate-200"
+                  activeOpacity={0.7}
+                  className="flex-1 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 py-2.5"
                 >
                   <Text className="text-xs font-semibold text-slate-700">
                     Reset Default
@@ -286,7 +289,8 @@ export function AviStatusHeader({
                 <TouchableOpacity
                   onPress={handleSaveUrl}
                   disabled={saving}
-                  className="flex-1 items-center justify-center rounded-xl bg-sky-600 py-2.5 active:bg-sky-700"
+                  activeOpacity={0.8}
+                  className="flex-1 items-center justify-center rounded-xl bg-sky-600 py-2.5"
                 >
                   <Text className="text-xs font-bold text-white">
                     {saving ? "Saving..." : "Save Endpoint"}

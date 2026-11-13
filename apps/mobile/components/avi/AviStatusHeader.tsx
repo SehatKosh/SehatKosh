@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Modal,
   Platform,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -171,14 +171,21 @@ export function AviStatusHeader({
         </TouchableOpacity>
       </View>
 
-      {/* Server Endpoint Config Modal */}
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View className="flex-1 items-center justify-center bg-black/50 px-5">
+      {/* Server Endpoint Config Overlay (Pure View overlay to prevent Fabric Modal touch bugs) */}
+      {modalVisible && (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              zIndex: 9999,
+              elevation: 9999,
+              justifyContent: "center",
+              alignItems: "center",
+              paddingHorizontal: 20,
+            },
+          ]}
+        >
           <View className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
             {/* Modal Header */}
             <View className="flex-row items-center justify-between pb-3 border-b border-slate-100">
@@ -300,7 +307,7 @@ export function AviStatusHeader({
             </View>
           </View>
         </View>
-      </Modal>
+      )}
     </>
   );
 }

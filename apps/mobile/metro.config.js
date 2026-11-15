@@ -39,6 +39,3 @@ module.exports = withNativeWind(config, {
   projectRoot: projectRoot,
   configPath: path.resolve(projectRoot, "tailwind.config.js"),
 });
-
-
-

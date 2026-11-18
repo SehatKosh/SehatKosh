@@ -2,19 +2,27 @@ import { Tabs } from "expo-router";
 import { Activity, FolderHeart, MessageSquareMore, Plus, SlidersHorizontal } from "lucide-react-native";
 import { TouchableOpacity, View } from "react-native";
 import { useIntakeActions } from "../../components/GlobalOverlays";
+import { useAppTheme } from "../../constants/themeContext";
 
 export default function TabLayout() {
   const { openIntakeActionSheet } = useIntakeActions();
+  const { theme, isDark } = useAppTheme();
 
   return (
     <Tabs
       backBehavior="history"
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#0284C7",
-        tabBarInactiveTintColor: "#94A3B8",
+        tabBarActiveTintColor: isDark ? "#38BDF8" : "#0284C7",
+        tabBarInactiveTintColor: theme.textSecondary,
         tabBarLabelStyle: { fontSize: 10, fontWeight: "600" },
-        tabBarStyle: { height: 78, paddingBottom: 14, paddingTop: 8, borderTopColor: "#E2E8F0", backgroundColor: "#FFFFFF" },
+        tabBarStyle: {
+          height: 78,
+          paddingBottom: 14,
+          paddingTop: 8,
+          borderTopColor: theme.border,
+          backgroundColor: theme.surface,
+        },
       }}
     >
       <Tabs.Screen
@@ -37,7 +45,13 @@ export default function TabLayout() {
           title: "Intake",
           tabBarButton: ({ onPress, accessibilityLabel }) => (
             <TouchableOpacity onPress={onPress} className="-mt-5 flex-1 items-center justify-center" accessibilityLabel={accessibilityLabel ?? "Start clinical intake"}>
-              <View className="h-16 w-16 items-center justify-center rounded-full border-4 border-white bg-sky-600 shadow-lg">
+              <View
+                className="h-16 w-16 items-center justify-center rounded-full border-4 shadow-lg"
+                style={{
+                  backgroundColor: "#0284C7",
+                  borderColor: theme.canvas,
+                }}
+              >
                 <Plus color="#FFFFFF" size={30} strokeWidth={2.5} />
               </View>
             </TouchableOpacity>

@@ -16,6 +16,7 @@ export interface RingsPalette {
 export interface ColorPalette {
   mode: "dark" | "light";
   canvas: string;
+  background: string;
   surface: string;
   surfaceElevated: string;
   activePill: string;
@@ -41,6 +42,7 @@ export interface ColorPalette {
 export const DARK_COLORS: ColorPalette = {
   mode: "dark",
   canvas: "#000000",
+  background: "#000000",
   surface: "#141822",
   surfaceElevated: "#1C2230",
   activePill: "#1F2637",
@@ -73,6 +75,7 @@ export const DARK_COLORS: ColorPalette = {
 export const LIGHT_COLORS: ColorPalette = {
   mode: "light",
   canvas: "#F1F5F9",
+  background: "#F1F5F9",
   surface: "#FFFFFF",
   surfaceElevated: "#FFFFFF",
   activePill: "#E2E8F0",
@@ -173,3 +176,4 @@ export function useTheme(): ThemeContextValue {
 
 // Backwards compatibility alias for components using useAppTheme
 export const useAppTheme = useTheme;
+

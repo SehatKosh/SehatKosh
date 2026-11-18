@@ -7,17 +7,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  Activity,
-  Droplet,
-  Flame,
-  Footprints,
-  HeartPulse,
-  Moon,
-  MoonStar,
-  Sun,
-  Watch,
-} from "lucide-react-native";
+import { MoonStar, Sun, Watch } from "lucide-react-native";
 
 import { useTheme } from "../../context/ThemeContext";
 import { usePatient } from "../../context/PatientContext";
@@ -224,11 +214,9 @@ export default function ActivityScreen() {
         {/* ── Section 1: Single Apple Health Activity Ring Hero Card ───────── */}
         <AppleHealthSingleRing
           steps={telemetry.steps}
-          stepGoal={telemetry.stepGoal}
+          distanceKm={telemetry.distanceKm}
           activeKcal={telemetry.activeKcal}
           kcalGoal={telemetry.kcalGoal}
-          medsTaken={telemetry.medsTaken}
-          medsTotal={telemetry.medsTotal}
         />
 
         {/* ── Section 2: Interactive 2-Column Bento Metric Grid ────────────── */}
@@ -237,22 +225,24 @@ export default function ActivityScreen() {
           <View style={styles.bentoRow}>
             <BentoMetricCard
               id="hr"
-              icon={<HeartPulse size={18} color="#FF3B5C" />}
-              iconBgColor="rgba(255, 59, 92, 0.12)"
+              label="Resting HR"
+              sublabel="Today"
               value={String(telemetry.restingHr)}
               unit="BPM"
-              label="Resting HR"
-              bars={[40, 65, 80, 50, 72, 60]}
+              accentColor="#FA114F"
+              valueColor="#FA114F"
+              ticks={[18, 15, 12, 10, 10, 15, 30, 50, 72, 68, 75, 72, 80, 76, 74, 82, 78, 65, 55, 48, 40, 32, 25, 20]}
               onPress={handleCardPress}
             />
             <BentoMetricCard
               id="spo2"
-              icon={<Activity size={18} color="#3B82F6" />}
-              iconBgColor="rgba(59, 130, 246, 0.12)"
+              label="Blood Oxygen"
+              sublabel="Today"
               value={String(telemetry.spo2)}
               unit="%"
-              label="Blood Oxygen"
-              bars={[85, 90, 88, 92, 98, 95]}
+              accentColor="#38BDF8"
+              valueColor="#38BDF8"
+              ticks={[88, 90, 89, 90, 92, 95, 98, 98, 97, 98, 98, 99, 98, 98, 98, 99, 98, 98, 97, 98, 98, 97, 98, 98]}
               onPress={handleCardPress}
             />
           </View>
@@ -261,22 +251,23 @@ export default function ActivityScreen() {
           <View style={styles.bentoRow}>
             <BentoMetricCard
               id="bp"
-              icon={<Droplet size={18} color="#F59E0B" />}
-              iconBgColor="rgba(245, 158, 11, 0.12)"
+              label="Blood Pressure"
+              sublabel="Today"
               value={telemetry.bloodPressure}
               unit="mmHg"
-              label="Blood Pressure"
-              badge="Normal"
-              badgeColor="#10B981"
+              accentColor="#F59E0B"
+              valueColor="#F59E0B"
+              ticks={[30, 28, 25, 22, 20, 24, 45, 65, 75, 70, 78, 72, 80, 76, 72, 75, 70, 62, 55, 48, 42, 36, 32, 28]}
               onPress={handleCardPress}
             />
             <BentoMetricCard
               id="sleep"
-              icon={<Moon size={18} color="#818CF8" />}
-              iconBgColor="rgba(129, 140, 248, 0.12)"
-              value={telemetry.sleepDuration}
               label="Sleep"
-              bars={[30, 45, 60, 80, 95, 75]}
+              sublabel="Today"
+              value={telemetry.sleepDuration}
+              accentColor="#818CF8"
+              valueColor="#818CF8"
+              ticks={[95, 95, 90, 85, 92, 88, 70, 30, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 60]}
               onPress={handleCardPress}
             />
           </View>
@@ -285,23 +276,24 @@ export default function ActivityScreen() {
           <View style={styles.bentoRow}>
             <BentoMetricCard
               id="steps"
-              icon={<Footprints size={18} color="#38BDF8" />}
-              iconBgColor="rgba(56, 189, 248, 0.12)"
+              label="Step Distance"
+              sublabel="Today"
               value={`${telemetry.distanceKm}`}
               unit="KM"
-              label="Step Distance"
-              bars={[35, 50, 75, 60, 85, 70]}
+              accentColor="#0284C7"
+              valueColor="#0284C7"
+              ticks={[0, 0, 0, 0, 0, 5, 20, 45, 60, 55, 75, 80, 85, 70, 65, 90, 85, 60, 45, 30, 20, 10, 5, 0]}
               onPress={handleCardPress}
             />
             <BentoMetricCard
               id="glucose"
-              icon={<Flame size={18} color="#10B981" />}
-              iconBgColor="rgba(16, 185, 129, 0.12)"
+              label="Blood Glucose"
+              sublabel="Today"
               value={String(telemetry.glucoseMgDl)}
               unit="mg/dL"
-              label="Blood Glucose"
-              badge="Fasting"
-              badgeColor="#10B981"
+              accentColor="#10B981"
+              valueColor="#10B981"
+              ticks={[40, 38, 35, 32, 30, 35, 55, 75, 65, 58, 70, 85, 72, 60, 55, 68, 78, 70, 60, 52, 48, 44, 42, 40]}
               onPress={handleCardPress}
             />
           </View>

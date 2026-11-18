@@ -5,32 +5,46 @@ import { useTheme } from "../../context/ThemeContext";
 
 export interface BentoMetricCardProps {
   id: string;
-  icon: React.ReactNode;
-  iconBgColor?: string;
-  value: string;
-  unit?: string;
   label: string;
   sublabel?: string;
-  badge?: string;
-  badgeColor?: string;
-  bars?: number[]; // e.g. [20, 45, 70, 30, 85, 60] mini hourly bars
+  value: string;
+  unit?: string;
+  valueColor?: string;
+  unitColor?: string;
+  accentColor?: string;
+  ticks?: number[]; // array of 0 to 100 percentages for 24 hours
   onPress: (id: string) => void;
 }
 
+// 24 default hour heights for realistic baseline curve if none passed
+const DEFAULT_24_TICKS = [
+  15, 12, 10, 8, 8, 12, 25, 45, 60, 55, 70, 65, 80, 75, 85, 90, 70, 60, 50, 45, 35, 30, 25, 20,
+];
+
 export function BentoMetricCard({
   id,
-  icon,
-  iconBgColor,
-  value,
-  unit,
   label,
   sublabel = "Today",
-  badge,
-  badgeColor,
-  bars,
+  value,
+  unit,
+  valueColor,
+  unitColor,
+  accentColor = "#FA114F",
+  ticks = DEFAULT_24_TICKS,
   onPress,
 }: BentoMetricCardProps) {
   const { colors, isDark } = useTheme();
+
+  // Normalize ticks to 24 slots
+  const displayTicks = React.useMemo(() => {
+    if (!ticks || ticks.length === 0) return DEFAULT_24_TICKS;
+    if (ticks.length === 24) return ticks;
+    // Stretch/repeat to 24 if fewer provided
+    return Array.from({ length: 24 }, (_, i) => {
+      const idx = Math.floor((i / 24) * ticks.length);
+      return ticks[idx] ?? 20;
+    });
+  }, [ticks]);
 
   return (
     <Pressable
@@ -46,52 +60,49 @@ export function BentoMetricCard({
         },
       ]}
     >
-      {/* ── Top Row: Icon + Mini Chevron Circle ──────────────────────────── */}
+      {/* ── Top Row: Metric Name + Circular Chevron Badge ─────────────────── */}
       <View style={styles.topRow}>
-        <View style={styles.topLeftGroup}>
-          <View
-            style={[
-              styles.iconWrapper,
-              {
-                backgroundColor:
-                  iconBgColor ||
-                  (isDark ? "#1C2230" : "#F1F5F9"),
-              },
-            ]}
-          >
-            {icon}
-          </View>
-          <Text
-            style={[
-              styles.sublabelText,
-              { color: colors.textSecondary },
-            ]}
-          >
-            {sublabel}
-          </Text>
-        </View>
-
+        <Text
+          style={[
+            styles.metricTitle,
+            { color: colors.textPrimary },
+          ]}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
         <View
           style={[
-            styles.chevronCircle,
+            styles.chevronBadge,
             {
-              backgroundColor: isDark ? "#1C2230" : "#F1F5F9",
+              backgroundColor: isDark
+                ? "rgba(255, 255, 255, 0.08)"
+                : "#F1F5F9",
             },
           ]}
         >
-          <ChevronRight size={12} color={colors.textSecondary} />
+          <ChevronRight size={11} color={colors.textSecondary} />
         </View>
       </View>
 
-      {/* ── Value Row: Bold 26px Metric + Unit ───────────────────────────── */}
+      {/* ── Subtitle: Today ──────────────────────────────────────────────── */}
+      <Text
+        style={[
+          styles.sublabel,
+          { color: colors.textSecondary },
+        ]}
+      >
+        {sublabel}
+      </Text>
+
+      {/* ── Large Metric Readout (24px Bold, tabular-nums) ────────────────── */}
       <View style={styles.valueRow}>
         <Text
           style={[
             styles.valueText,
-            { color: colors.textPrimary },
+            { color: valueColor || colors.textPrimary },
           ]}
           numberOfLines={1}
-          adjustsFontSizeToFit
         >
           {value}
         </Text>
@@ -99,7 +110,7 @@ export function BentoMetricCard({
           <Text
             style={[
               styles.unitText,
-              { color: colors.textSecondary },
+              { color: unitColor || valueColor || colors.textSecondary },
             ]}
           >
             {unit}
@@ -107,63 +118,53 @@ export function BentoMetricCard({
         ) : null}
       </View>
 
-      {/* ── Mini Hourly Bar Chart or Status Badge ────────────────────────── */}
-      {bars && bars.length > 0 ? (
-        <View style={styles.miniBarContainer}>
-          {bars.map((h, i) => (
-            <View
-              key={i}
-              style={[
-                styles.miniBarTrack,
-                {
-                  backgroundColor: isDark ? "#1E2536" : "#E2E8F0",
-                },
-              ]}
-            >
+      {/* ── Bottom: 24 Narrow Vertical Tick Bars (width: 2.5px) ───────────── */}
+      <View style={styles.visualizationContainer}>
+        <View style={styles.ticksRow}>
+          {displayTicks.map((fillPercent, index) => {
+            const clamped = Math.max(8, Math.min(100, fillPercent));
+            return (
               <View
+                key={index}
                 style={[
-                  styles.miniBarFill,
+                  styles.tickTrack,
                   {
-                    height: `${Math.min(Math.max(h, 15), 100)}%`,
-                    backgroundColor: colors.tabBarActive,
+                    backgroundColor: isDark
+                      ? "rgba(255, 255, 255, 0.12)"
+                      : "rgba(0, 0, 0, 0.08)",
                   },
                 ]}
-              />
-            </View>
-          ))}
+              >
+                <View
+                  style={[
+                    styles.tickFill,
+                    {
+                      height: `${clamped}%`,
+                      backgroundColor: accentColor,
+                    },
+                  ]}
+                />
+              </View>
+            );
+          })}
         </View>
-      ) : badge ? (
-        <View
-          style={[
-            styles.badgePill,
-            {
-              backgroundColor: badgeColor
-                ? `${badgeColor}20`
-                : "rgba(16, 185, 129, 0.15)",
-            },
-          ]}
-        >
-          <Text
-            style={[
-              styles.badgeText,
-              { color: badgeColor || "#10B981" },
-            ]}
-          >
-            {badge}
+
+        {/* Time-axis labels */}
+        <View style={styles.timeAxisRow}>
+          <Text style={[styles.timeAxisText, { color: colors.textSecondary }]}>
+            12AM
+          </Text>
+          <Text style={[styles.timeAxisText, { color: colors.textSecondary }]}>
+            6AM
+          </Text>
+          <Text style={[styles.timeAxisText, { color: colors.textSecondary }]}>
+            12PM
+          </Text>
+          <Text style={[styles.timeAxisText, { color: colors.textSecondary }]}>
+            6PM
           </Text>
         </View>
-      ) : null}
-
-      {/* ── Bottom Label: Single/Two-Word Title ──────────────────────────── */}
-      <Text
-        style={[
-          styles.labelText,
-          { color: colors.textSecondary },
-        ]}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
+      </View>
     </Pressable>
   );
 }
@@ -171,95 +172,86 @@ export function BentoMetricCard({
 const styles = StyleSheet.create({
   cardContainer: {
     flex: 1,
-    minHeight: 154,
+    minHeight: 168,
     borderRadius: 20,
     borderWidth: 1,
     padding: 16,
     justifyContent: "space-between",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
   topRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  topLeftGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+  metricTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    letterSpacing: -0.2,
+    flex: 1,
+    marginRight: 6,
   },
-  iconWrapper: {
-    width: 34,
-    height: 34,
+  chevronBadge: {
+    width: 20,
+    height: 20,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  sublabelText: {
-    fontSize: 11,
+  sublabel: {
+    fontSize: 12,
     fontWeight: "500",
-  },
-  chevronCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
+    marginTop: 1,
   },
   valueRow: {
     flexDirection: "row",
     alignItems: "baseline",
     gap: 4,
-    marginTop: 4,
-    marginBottom: 4,
+    marginTop: 6,
+    marginBottom: 6,
   },
   valueText: {
-    fontSize: 26,
-    lineHeight: 30,
-    fontWeight: "800",
+    fontSize: 24,
+    fontWeight: "700",
     fontVariant: ["tabular-nums"],
     letterSpacing: -0.4,
   },
   unitText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "600",
   },
-  miniBarContainer: {
+  visualizationContainer: {
+    marginTop: 6,
+  },
+  ticksRow: {
     flexDirection: "row",
     alignItems: "flex-end",
-    gap: 4,
-    height: 20,
-    marginVertical: 4,
+    justifyContent: "space-between",
+    height: 34,
   },
-  miniBarTrack: {
-    flex: 1,
-    height: 20,
-    borderRadius: 3,
+  tickTrack: {
+    width: 2.5,
+    height: 34,
+    borderRadius: 2,
     justifyContent: "flex-end",
     overflow: "hidden",
   },
-  miniBarFill: {
-    width: "100%",
-    borderRadius: 3,
+  tickFill: {
+    width: 2.5,
+    borderRadius: 2,
   },
-  badgePill: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 9999,
-    marginVertical: 4,
+  timeAxisRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 4,
   },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-  },
-  labelText: {
-    fontSize: 13,
-    fontWeight: "600",
+  timeAxisText: {
+    fontSize: 9,
+    fontWeight: "500",
     letterSpacing: -0.2,
   },
 });

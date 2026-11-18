@@ -6,10 +6,11 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   StyleSheet,
   View,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import Animated, {
@@ -45,6 +46,7 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
   const { patient, telemetry } = usePatient();
+  const { initialQuery } = useLocalSearchParams<{ initialQuery?: string }>();
 
   const listRef = useRef<FlatList>(null);
   const textInputRef = useRef<any>(null);
@@ -57,13 +59,20 @@ export default function ChatScreen() {
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
 
   // ── Chat & Multimodal State ───────────────────────────────────────────────
-  const [input, setInput] = useState("");
-  const inputRef = useRef("");
+  const [input, setInput] = useState(initialQuery || "");
+  const inputRef = useRef(initialQuery || "");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [selectedImage, setSelectedImage] = useState<PreparedImage | null>(null);
 
-  // ── Android Keyboard Height Tracking (Solves Android keyboard overlap) ─────
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  useEffect(() => {
+    if (initialQuery && typeof initialQuery === "string") {
+      setInput(initialQuery);
+      inputRef.current = initialQuery;
+    }
+  }, [initialQuery]);
+
+  // ── Keyboard Visibility Tracking ──────────────────────────────────────────
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
     const showEvent =
@@ -71,17 +80,12 @@ export default function ChatScreen() {
     const hideEvent =
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
-    const showSub = Keyboard.addListener(showEvent, (e) => {
-      if (Platform.OS === "android") {
-        // Offset by keyboard height minus bottom tab bar height (~78px)
-        setKeyboardOffset(Math.max(e.endCoordinates.height - 78, 12));
-      }
+    const showSub = Keyboard.addListener(showEvent, () => {
+      setKeyboardVisible(true);
     });
 
     const hideSub = Keyboard.addListener(hideEvent, () => {
-      if (Platform.OS === "android") {
-        setKeyboardOffset(0);
-      }
+      setKeyboardVisible(false);
     });
 
     return () => {
@@ -441,14 +445,20 @@ export default function ChatScreen() {
         keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
         {isZeroState ? (
-          /* Custom SehatKosh Clinical Shield Hero Canvas (70%+ Negative Space) */
-          <AnimatedView
-            entering={FadeIn.duration(240)}
-            exiting={FadeOutUp.duration(200)}
-            style={styles.zeroStateWrapper}
+          /* Tap Anywhere Outside Input to Dismiss Keyboard */
+          <Pressable
+            style={styles.zeroStatePressable}
+            onPress={Keyboard.dismiss}
+            accessible={false}
           >
-            <AviHeroEmblem prompt="What should we focus on?" />
-          </AnimatedView>
+            <AnimatedView
+              entering={FadeIn.duration(240)}
+              exiting={FadeOutUp.duration(200)}
+              style={styles.zeroStateWrapper}
+            >
+              <AviHeroEmblem prompt="What should we focus on?" />
+            </AnimatedView>
+          </Pressable>
         ) : (
           /* Active Chat Stream */
           <FlatList
@@ -480,8 +490,10 @@ export default function ChatScreen() {
         <View
           style={{
             paddingBottom:
-              Platform.OS === "android" && keyboardOffset > 0
-                ? keyboardOffset
+              Platform.OS === "android"
+                ? keyboardVisible
+                  ? 10
+                  : bottomPadding
                 : bottomPadding,
           }}
         >
@@ -510,6 +522,10 @@ const styles = StyleSheet.create({
   flexContainer: {
     flex: 1,
     justifyContent: "space-between",
+  },
+  zeroStatePressable: {
+    flex: 1,
+    width: "100%",
   },
   zeroStateWrapper: {
     flex: 1,

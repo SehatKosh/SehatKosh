@@ -197,7 +197,9 @@ export function AviBottomDock({
           onChangeText={onInputChange}
           placeholder="Ask Avi"
           placeholderTextColor={colors.textMuted}
-          multiline
+          multiline={true}
+          scrollEnabled={true}
+          textAlignVertical="center"
           maxLength={800}
           editable={!isStreaming}
           returnKeyType="send"
@@ -316,11 +318,11 @@ const styles = StyleSheet.create({
   dockCapsule: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 31,
+    borderRadius: 30,
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    minHeight: 62,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    minHeight: 60,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
@@ -335,11 +337,14 @@ const styles = StyleSheet.create({
   },
   dockInput: {
     flex: 1,
+    minHeight: 44,
+    maxHeight: 112,
+    paddingTop: 10,
+    paddingBottom: 10,
+    paddingHorizontal: 8,
     fontSize: 16,
     lineHeight: 22,
-    maxHeight: 110,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    textAlignVertical: "center",
   },
   dockActionButton: {
     width: 40,

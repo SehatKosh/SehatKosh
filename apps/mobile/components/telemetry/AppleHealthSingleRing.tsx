@@ -5,34 +5,30 @@ import { useTheme } from "../../context/ThemeContext";
 
 interface SingleRingProps {
   steps?: number;
-  stepGoal?: number;
+  distanceKm?: number;
   activeKcal?: number;
   kcalGoal?: number;
-  medsTaken?: number;
-  medsTotal?: number;
 }
 
 const RING_CONFIG = {
-  size: 148,
-  center: 74,
-  radius: 52,
-  strokeWidth: 20,
+  size: 136,
+  center: 68,
+  radius: 56, // (136 - 24) / 2 = 56
+  strokeWidth: 24,
 };
 
 export function AppleHealthSingleRing({
   steps = 6420,
-  stepGoal = 8000,
+  distanceKm = 4.8,
   activeKcal = 285,
   kcalGoal = 400,
-  medsTaken = 2,
-  medsTotal = 2,
 }: SingleRingProps) {
   const { colors, isDark } = useTheme();
 
   // Animated sweep percentage from 0 to 1
   const [sweep, setSweep] = useState(0);
 
-  const targetProgress = Math.min(steps / (stepGoal || 8000), 1); // 0.8025 (80%)
+  const moveProgress = Math.min(activeKcal / (kcalGoal || 400), 1); // ~0.71
 
   useEffect(() => {
     let frameId: number;
@@ -55,7 +51,7 @@ export function AppleHealthSingleRing({
   }, []);
 
   const circumference = 2 * Math.PI * RING_CONFIG.radius;
-  const strokeOffset = circumference * (1 - targetProgress * sweep);
+  const strokeOffset = circumference * (1 - moveProgress * sweep);
 
   return (
     <View
@@ -67,24 +63,24 @@ export function AppleHealthSingleRing({
         },
       ]}
     >
-      {/* ── Left: Single Bold Apple Health Progress Ring ──────────────────── */}
+      {/* ── Left Side: Thick Single Activity Ring (Empty Center) ───────────── */}
       <View style={styles.ringWrapper}>
         <Svg
           width={RING_CONFIG.size}
           height={RING_CONFIG.size}
           viewBox={`0 0 ${RING_CONFIG.size} ${RING_CONFIG.size}`}
         >
-          {/* Background track (18% opacity) */}
+          {/* Deep translucent track at 20% opacity */}
           <Circle
             cx={RING_CONFIG.center}
             cy={RING_CONFIG.center}
             r={RING_CONFIG.radius}
-            stroke="rgba(255, 59, 92, 0.18)"
+            stroke="rgba(250, 17, 79, 0.20)"
             strokeWidth={RING_CONFIG.strokeWidth}
             fill="transparent"
           />
 
-          {/* Active progress track rotated -90 deg */}
+          {/* Active arc starting at 12 o'clock (-90 deg rotation) */}
           <G
             rotation="-90"
             origin={`${RING_CONFIG.center}, ${RING_CONFIG.center}`}
@@ -93,7 +89,7 @@ export function AppleHealthSingleRing({
               cx={RING_CONFIG.center}
               cy={RING_CONFIG.center}
               r={RING_CONFIG.radius}
-              stroke="#FF3B5C"
+              stroke="#FA114F"
               strokeWidth={RING_CONFIG.strokeWidth}
               strokeDasharray={circumference}
               strokeDashoffset={strokeOffset}
@@ -102,80 +98,60 @@ export function AppleHealthSingleRing({
             />
           </G>
 
-          {/* Directional arrow icon embedded at top starting cap */}
+          {/* Crisp right-pointing arrow embedded inside starting cap at 12 o'clock */}
+          {/* Center of cap at 12 o'clock is (68, 12) */}
           <Path
-            d="M74 15L78 22H70L74 15Z"
-            fill="#FFFFFF"
-            transform="rotate(90 74 22)"
+            d="M65.5 8.5L71.5 12L65.5 15.5"
+            stroke="#000000"
+            strokeWidth={2.4}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
           />
         </Svg>
-
-        {/* Center percentage badge */}
-        <View style={styles.centerBadge}>
-          <Text
-            style={[
-              styles.centerPercentText,
-              { color: colors.textPrimary },
-            ]}
-          >
-            {Math.round(targetProgress * sweep * 100)}%
-          </Text>
-        </View>
       </View>
 
-      {/* ── Right: Real-World Activity Metrics ─────────────────────────────── */}
+      {/* ── Right Side: Clean 3-Row Metric Stack (tabular-nums) ────────────── */}
       <View style={styles.metricsColumn}>
-        {/* Move / Steps Metric */}
+        {/* Row 1: MOVE */}
         <View style={styles.metricItem}>
-          <Text style={[styles.metricLabel, { color: "#FF3B5C" }]}>
-            MOVE / STEPS
+          <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            MOVE
+          </Text>
+          <Text style={styles.moveValue}>
+            {activeKcal}/{kcalGoal}{" "}
+            <Text style={styles.moveUnit}>KCAL</Text>
+          </Text>
+        </View>
+
+        {/* Row 2: STEPS */}
+        <View style={styles.metricItem}>
+          <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            STEPS
           </Text>
           <Text
             style={[
-              styles.metricValue,
+              styles.standardValue,
               { color: colors.textPrimary },
             ]}
           >
             {steps.toLocaleString()}
-            <Text style={[styles.metricGoal, { color: colors.textSecondary }]}>
-              {" "}/ {stepGoal.toLocaleString()}
-            </Text>
           </Text>
         </View>
 
-        {/* Active Energy Metric */}
+        {/* Row 3: DISTANCE */}
         <View style={styles.metricItem}>
-          <Text style={[styles.metricLabel, { color: colors.accentAmber }]}>
-            ACTIVE ENERGY
+          <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            DISTANCE
           </Text>
           <Text
             style={[
-              styles.metricValue,
+              styles.standardValue,
               { color: colors.textPrimary },
             ]}
           >
-            {activeKcal}
-            <Text style={[styles.metricGoal, { color: colors.textSecondary }]}>
-              {" "}/ {kcalGoal} KCAL
-            </Text>
-          </Text>
-        </View>
-
-        {/* Medications Metric */}
-        <View style={styles.metricItem}>
-          <Text style={[styles.metricLabel, { color: colors.accentEmerald }]}>
-            MEDICATIONS
-          </Text>
-          <Text
-            style={[
-              styles.metricValue,
-              { color: colors.textPrimary },
-            ]}
-          >
-            {medsTaken}
-            <Text style={[styles.metricGoal, { color: colors.textSecondary }]}>
-              {" "}/ {medsTotal} TAKEN
-            </Text>
+            {distanceKm}{" "}
+            <Text style={styles.distanceUnit}>KM</Text>
           </Text>
         </View>
       </View>
@@ -187,11 +163,11 @@ const styles = StyleSheet.create({
   heroCard: {
     borderRadius: 24,
     borderWidth: 1,
-    padding: 18,
+    padding: 20,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 20,
+    marginBottom: 18,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -199,45 +175,45 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   ringWrapper: {
-    width: 148,
-    height: 148,
+    width: 136,
+    height: 136,
     alignItems: "center",
     justifyContent: "center",
-    position: "relative",
-  },
-  centerBadge: {
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  centerPercentText: {
-    fontSize: 22,
-    fontWeight: "800",
-    fontVariant: ["tabular-nums"],
-    letterSpacing: -0.5,
   },
   metricsColumn: {
     flex: 1,
-    marginLeft: 18,
+    marginLeft: 22,
     gap: 12,
     justifyContent: "center",
   },
   metricItem: {
-    gap: 2,
+    gap: 1,
   },
   metricLabel: {
     fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0.6,
-  },
-  metricValue: {
-    fontSize: 18,
     fontWeight: "700",
-    fontVariant: ["tabular-nums"],
-    letterSpacing: -0.3,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
   },
-  metricGoal: {
-    fontSize: 12,
-    fontWeight: "500",
+  moveValue: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#FA114F",
+    fontVariant: ["tabular-nums"],
+    letterSpacing: -0.4,
+  },
+  moveUnit: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  standardValue: {
+    fontSize: 22,
+    fontWeight: "800",
+    fontVariant: ["tabular-nums"],
+    letterSpacing: -0.4,
+  },
+  distanceUnit: {
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

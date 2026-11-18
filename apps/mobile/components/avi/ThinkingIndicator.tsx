@@ -1,6 +1,18 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Text, TouchableOpacity, View } from "react-native";
-import { Cpu, Square } from "lucide-react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Square } from "lucide-react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+  Easing,
+} from "react-native-reanimated";
+import Svg, { Path } from "react-native-svg";
+import { useAppTheme } from "../../constants/themeContext";
+import { RADII } from "../../constants/theme";
+
+const AnimatedView = Animated.View as any;
 
 interface ThinkingIndicatorProps {
   stage: "uploading" | "queued" | "generating";
@@ -15,7 +27,25 @@ export function ThinkingIndicator({
   startTime,
   onCancel,
 }: ThinkingIndicatorProps) {
+  const { theme, isDark } = useAppTheme();
   const [elapsed, setElapsed] = useState("0.0");
+
+  const pulse = useSharedValue(1);
+
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withTiming(1.25, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+  }, []);
+
+  const animatedStarStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ scale: pulse.value }],
+      opacity: pulse.value > 1.1 ? 0.95 : 0.7,
+    };
+  });
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -26,59 +56,93 @@ export function ThinkingIndicator({
     return () => clearInterval(timer);
   }, [startTime]);
 
-  const getStageMessage = () => {
-    const sec = parseFloat(elapsed);
-    if (stage === "uploading" && hasImage) {
-      return "Optimizing & uploading medical image...";
-    }
-    if (stage === "queued" || sec < 2.0) {
-      return "Queued on MedGemma GPU (RTX 4000 Ada)...";
-    }
-    if (sec < 5.0) {
-      return hasImage
-        ? "SigLIP vision encoding & clinical prefill..."
-        : "MedGemma 1.5 4B contextual prefill...";
-    }
-    return "Synthesizing longitudinal clinical insights...";
+  const getStageLabel = () => {
+    if (stage === "uploading" && hasImage) return "Analyzing image...";
+    if (stage === "queued") return "Thinking...";
+    return "Generating...";
   };
 
   return (
-    <View className="mb-4 self-start max-w-[92%] rounded-2xl rounded-tl-sm border border-sky-100 bg-sky-50/80 p-3.5 shadow-sm">
-      <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center">
-          <View className="mr-2 h-7 w-7 items-center justify-center rounded-lg bg-sky-600">
-            <Cpu size={15} color="#FFFFFF" />
-          </View>
-          <View>
-            <Text className="text-xs font-bold text-sky-950">
-              Avi MedGemma 1.5 4B
-            </Text>
-            <Text className="text-[11px] font-mono text-sky-700">
-              Inference latency: {elapsed}s
-            </Text>
-          </View>
-        </View>
+    <View style={styles.container}>
+      <View style={styles.leftRow}>
+        <AnimatedView style={[styles.starContainer, animatedStarStyle]}>
+          <Svg width={18} height={18} viewBox="0 0 24 24">
+            <Path
+              d="M12 0C12 7.5 16.5 12 24 12C16.5 12 12 16.5 12 24C12 16.5 7.5 12 0 12C7.5 12 12 7.5 12 0Z"
+              fill="#3B82F6"
+            />
+          </Svg>
+        </AnimatedView>
 
-        {onCancel && (
-          <TouchableOpacity
-            onPress={onCancel}
-            activeOpacity={0.7}
-            className="flex-row items-center rounded-lg border border-rose-200 bg-rose-50 px-2 py-1"
-          >
-            <Square size={10} color="#E11D48" fill="#E11D48" />
-            <Text className="ml-1 text-[11px] font-semibold text-rose-700">
-              Stop
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+        <Text style={[styles.stageText, { color: theme.textSecondary }]}>
+          {getStageLabel()}
+        </Text>
 
-      <View className="mt-2.5 flex-row items-center rounded-xl bg-white/80 px-3 py-2 border border-sky-100">
-        <ActivityIndicator size="small" color="#0284C7" />
-        <Text className="ml-2 text-xs font-medium text-slate-700">
-          {getStageMessage()}
+        <Text style={[styles.elapsedText, { color: theme.textMuted }]}>
+          {elapsed}s
         </Text>
       </View>
+
+      {onCancel && (
+        <TouchableOpacity
+          onPress={onCancel}
+          activeOpacity={0.7}
+          style={[
+            styles.stopPill,
+            {
+              backgroundColor: isDark ? "rgba(244, 63, 94, 0.15)" : "#FFF1F2",
+              borderColor: isDark ? "rgba(244, 63, 94, 0.3)" : "#FECDD3",
+            },
+          ]}
+        >
+          <Square size={9} color="#F43F5E" fill="#F43F5E" />
+          <Text style={styles.stopText}>Stop</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    marginBottom: 8,
+  },
+  leftRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  starContainer: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stageText: {
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  elapsedText: {
+    fontSize: 11,
+    fontVariant: ["tabular-nums"],
+  },
+  stopPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: RADII.pill,
+    borderWidth: 1,
+  },
+  stopText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#F43F5E",
+  },
+});

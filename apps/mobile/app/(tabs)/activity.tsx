@@ -1,33 +1,376 @@
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Footprints, HeartPulse, Moon, Sparkles, Watch } from "lucide-react-native";
-import { ScrollView, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  Activity,
+  Droplet,
+  Flame,
+  Footprints,
+  HeartPulse,
+  Moon,
+  MoonStar,
+  Sun,
+  Watch,
+} from "lucide-react-native";
+
 import { getVitals } from "../../services/apiClient";
+import { useAppTheme } from "../../constants/themeContext";
+import { RADII } from "../../constants/theme";
+import { AppleHealthRings } from "../../components/telemetry/AppleHealthRings";
+import { BentoMetricCard } from "../../components/telemetry/BentoMetricCard";
+import {
+  MetricDetailData,
+  MetricDetailSheet,
+} from "../../components/telemetry/MetricDetailSheet";
 
-const colors = { primary: "#0284C7", text: "#0F172A", secondary: "#475569", muted: "#94A3B8", border: "#E2E8F0" };
+export default function ActivityScreen() {
+  const insets = useSafeAreaInsets();
+  const { theme, isDark, toggleTheme } = useAppTheme();
 
-function MetricCard({ icon, title, value, unit, footer }: { icon: React.ReactNode; title: string; value: string; unit?: string; footer: React.ReactNode }) {
+  const { data: vitals, isLoading } = useQuery({
+    queryKey: ["vitals"],
+    queryFn: getVitals,
+  });
+
+  const heartRate =
+    vitals?.find((v) => v.code.text === "Heart Rate")?.valueQuantity.value ?? 72;
+
+  // Selected metric for bottom sheet
+  const [selectedMetric, setSelectedMetric] = useState<MetricDetailData | null>(
+    null
+  );
+
+  const METRIC_DETAILS: Record<string, MetricDetailData> = {
+    hr: {
+      id: "hr",
+      label: "Heart Rate",
+      currentValue: String(heartRate),
+      unit: "BPM",
+      status: "Resting Optimal",
+      statusColor: "#10B981",
+      sparklinePoints: [68, 72, 70, 75, 73, 71, 72],
+      recentReadings: [
+        { time: "10 mins ago", value: String(heartRate) },
+        { time: "1 hour ago", value: "74" },
+        { time: "3 hours ago", value: "70" },
+        { time: "Yesterday", value: "68" },
+      ],
+    },
+    spo2: {
+      id: "spo2",
+      label: "Blood Oxygen",
+      currentValue: "98",
+      unit: "%",
+      status: "Optimal",
+      statusColor: "#10B981",
+      sparklinePoints: [97, 98, 98, 99, 98, 98, 98],
+      recentReadings: [
+        { time: "15 mins ago", value: "98" },
+        { time: "2 hours ago", value: "99" },
+        { time: "Yesterday", value: "98" },
+      ],
+    },
+    bp: {
+      id: "bp",
+      label: "Blood Pressure",
+      currentValue: "118/76",
+      unit: "mmHg",
+      status: "Normal",
+      statusColor: "#10B981",
+      sparklinePoints: [116, 120, 118, 117, 119, 118],
+      recentReadings: [
+        { time: "Morning (08:30)", value: "118/76" },
+        { time: "Yesterday", value: "116/74" },
+        { time: "3 days ago", value: "120/78" },
+      ],
+    },
+    sleep: {
+      id: "sleep",
+      label: "Sleep",
+      currentValue: "7h 24m",
+      unit: "",
+      status: "Restorative",
+      statusColor: "#818CF8",
+      sparklinePoints: [6.5, 7.2, 6.8, 7.5, 7.1, 7.4],
+      recentReadings: [
+        { time: "Last Night", value: "7h 24m" },
+        { time: "Tue", value: "7h 08m" },
+        { time: "Mon", value: "6h 52m" },
+      ],
+    },
+    steps: {
+      id: "steps",
+      label: "Daily Steps",
+      currentValue: "6,420",
+      unit: "",
+      status: "Active",
+      statusColor: "#38BDF8",
+      sparklinePoints: [4200, 5800, 7100, 6200, 8400, 6420],
+      recentReadings: [
+        { time: "Today (Live)", value: "6,420" },
+        { time: "Yesterday", value: "8,400" },
+        { time: "Sunday", value: "5,800" },
+      ],
+    },
+    glucose: {
+      id: "glucose",
+      label: "Blood Glucose",
+      currentValue: "94",
+      unit: "mg/dL",
+      status: "Fasting Normal",
+      statusColor: "#10B981",
+      sparklinePoints: [96, 92, 98, 95, 94],
+      recentReadings: [
+        { time: "Fasting (07:45)", value: "94" },
+        { time: "Post-prandial", value: "118" },
+        { time: "Yesterday", value: "92" },
+      ],
+    },
+  };
+
+  const handleCardPress = (id: string) => {
+    if (METRIC_DETAILS[id]) {
+      setSelectedMetric(METRIC_DETAILS[id]);
+    }
+  };
+
+  const topPadding = Math.max(insets.top, 16);
+
   return (
-    <View className="min-h-[170px] flex-1 rounded-2xl border bg-white p-4" style={{ borderColor: colors.border }}>
-      <View className="mb-3 flex-row items-center gap-2">{icon}<Text className="text-xs font-semibold" style={{ color: colors.secondary }}>{title}</Text></View>
-      <View className="flex-row items-baseline gap-1"><Text className="text-3xl font-bold" style={{ color: colors.text }}>{value}</Text>{unit ? <Text className="text-xs font-medium" style={{ color: colors.muted }}>{unit}</Text> : null}</View>
-      <View className="mt-auto pt-4">{footer}</View>
+    <View style={[styles.rootContainer, { backgroundColor: theme.canvas }]}>
+      <ScrollView
+        style={styles.scrollContainer}
+        contentContainerStyle={[
+          styles.contentContainer,
+          { paddingTop: topPadding, paddingBottom: 40 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ── Minimal Header (Greeting, Sync Pill, Theme Switcher) ─────────── */}
+        <View style={styles.headerRow}>
+          <View>
+            <Text
+              style={[
+                styles.greetingText,
+                { color: theme.textPrimary },
+              ]}
+            >
+              Ahsan
+            </Text>
+            <Text
+              style={[
+                styles.dateSubText,
+                { color: theme.textSecondary },
+              ]}
+            >
+              Today
+            </Text>
+          </View>
+
+          <View style={styles.headerRightRow}>
+            {/* Sync Status Pill */}
+            <View
+              style={[
+                styles.syncPill,
+                {
+                  backgroundColor: isDark ? "#12151C" : "#FFFFFF",
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              <View style={styles.liveDot} />
+              <Watch size={13} color="#10B981" />
+              <Text
+                style={[
+                  styles.syncText,
+                  { color: theme.textSecondary },
+                ]}
+              >
+                Synced
+              </Text>
+            </View>
+
+            {/* Theme Toggle Button */}
+            <TouchableOpacity
+              onPress={toggleTheme}
+              activeOpacity={0.7}
+              style={[
+                styles.themeBtn,
+                {
+                  backgroundColor: isDark ? "#12151C" : "#FFFFFF",
+                  borderColor: theme.border,
+                },
+              ]}
+            >
+              {isDark ? (
+                <Sun size={15} color="#FBBF24" />
+              ) : (
+                <MoonStar size={15} color="#6366F1" />
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── Screen B: Apple Health Concentric Rings Hero Cluster ─────────── */}
+        <AppleHealthRings
+          vitalsProgress={0.94}
+          adherenceProgress={0.92}
+          biomarkersProgress={0.9}
+          vitalsLabel="94%"
+          adherenceLabel="92%"
+          biomarkersLabel="18/20"
+        />
+
+        {/* ── Screen B: 2-Column Bento Metric Grid (Strict 3-Element Rule) ─── */}
+        <View style={styles.bentoGrid}>
+          {/* Row 1: Heart Rate & Blood Oxygen */}
+          <View style={styles.bentoRow}>
+            <BentoMetricCard
+              id="hr"
+              icon={<HeartPulse size={20} color="#FF3B5C" />}
+              statusDotColor="#10B981"
+              value={String(heartRate)}
+              unit="BPM"
+              label="Resting HR"
+              onPress={handleCardPress}
+            />
+            <BentoMetricCard
+              id="spo2"
+              icon={<Activity size={20} color="#3B82F6" />}
+              statusDotColor="#10B981"
+              value="98"
+              unit="%"
+              label="Blood Oxygen"
+              onPress={handleCardPress}
+            />
+          </View>
+
+          {/* Row 2: Blood Pressure & Sleep */}
+          <View style={styles.bentoRow}>
+            <BentoMetricCard
+              id="bp"
+              icon={<Flame size={20} color="#F59E0B" />}
+              statusDotColor="#10B981"
+              value="118/76"
+              unit="mmHg"
+              label="Blood Pressure"
+              onPress={handleCardPress}
+            />
+            <BentoMetricCard
+              id="sleep"
+              icon={<Moon size={20} color="#818CF8" />}
+              statusDotColor="#818CF8"
+              value="7h 24m"
+              label="Sleep"
+              onPress={handleCardPress}
+            />
+          </View>
+
+          {/* Row 3: Daily Steps & Blood Glucose */}
+          <View style={styles.bentoRow}>
+            <BentoMetricCard
+              id="steps"
+              icon={<Footprints size={20} color="#38BDF8" />}
+              statusDotColor="#38BDF8"
+              value="6,420"
+              label="Daily Steps"
+              onPress={handleCardPress}
+            />
+            <BentoMetricCard
+              id="glucose"
+              icon={<Droplet size={20} color="#10B981" />}
+              statusDotColor="#10B981"
+              value="94"
+              unit="mg/dL"
+              label="Blood Glucose"
+              onPress={handleCardPress}
+            />
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* ── Interactive Longitudinal Trend Bottom Sheet ─────────────────────── */}
+      <MetricDetailSheet
+        data={selectedMetric}
+        onClose={() => setSelectedMetric(null)}
+      />
     </View>
   );
 }
 
-export default function ActivityScreen() {
-  const { data: vitals, isLoading } = useQuery({ queryKey: ["vitals"], queryFn: getVitals });
-  const heartRate = vitals?.find((vital) => vital.code.text === "Heart Rate")?.valueQuantity.value ?? 72;
-
-  return (
-    <ScrollView className="flex-1 bg-slate-50" contentContainerStyle={{ padding: 20, paddingTop: 56, paddingBottom: 32 }}>
-      <View className="mb-6 flex-row items-start justify-between"><View><Text className="text-3xl font-bold" style={{ color: colors.text }}>Hello, Ahsan</Text><Text className="mt-1 text-sm" style={{ color: colors.secondary }}>Wednesday, September 2</Text></View><TouchableOpacity className="flex-row items-center gap-2 rounded-full border bg-white px-3 py-2" style={{ borderColor: "#BBF7D0" }}><View className="h-2 w-2 rounded-full bg-emerald-500" /><Watch size={15} color="#10B981" /><Text className="text-xs font-semibold text-emerald-700">Synced 2m ago</Text></TouchableOpacity></View>
-      <View className="mb-5 rounded-2xl border p-5" style={{ backgroundColor: "#F0FDF4", borderColor: "#BBF7D0" }}><View className="mb-3 flex-row items-center gap-2"><Sparkles size={17} color="#10B981" /><Text className="text-xs font-bold tracking-wider text-emerald-700">DAILY CLINICAL SUMMARY</Text></View><Text className="mb-2 text-sm leading-5 text-slate-700">Your latest readings are stable and your resting heart rate is within its usual range.</Text><Text className="text-sm leading-5 text-slate-700">Keep hydration steady today and continue your active regimen after meals.</Text><TouchableOpacity className="mt-4 self-end"><Text className="text-sm font-bold text-emerald-700">View Timeline  →</Text></TouchableOpacity></View>
-      <Text className="mb-3 text-lg font-bold" style={{ color: colors.text }}>Today&apos;s vitals</Text>
-      {isLoading ? <Text className="mb-4 text-sm" style={{ color: colors.muted }}>Syncing wearable data...</Text> : null}
-      <View className="mb-6 flex-row gap-3"><MetricCard icon={<HeartPulse size={19} color="#EF4444" />} title="Heart Rate" value={String(heartRate)} unit="BPM" footer={<Text className="text-xs text-emerald-600">Within normal range</Text>} /><MetricCard icon={<Activity size={19} color={colors.primary} />} title="Blood Oxygen" value="98" unit="%" footer={<Text className="text-xs font-semibold text-emerald-600">Optimal</Text>} /></View>
-      <View className="mb-6 flex-row gap-3"><MetricCard icon={<Footprints size={19} color={colors.secondary} />} title="Steps" value="6,420" footer={<View><View className="mb-2 h-2 rounded-full bg-slate-100"><View className="h-2 w-2/3 rounded-full bg-sky-600" /></View><Text className="text-xs text-slate-500">64% of 10,000 goal</Text></View>} /><MetricCard icon={<Moon size={19} color="#6366F1" />} title="Sleep" value="7h 24m" footer={<Text className="text-xs text-slate-500">85% deep / REM efficiency</Text>} /></View>
-      <Text className="mb-3 text-lg font-bold" style={{ color: colors.text }}>Active regimen today</Text><View className="rounded-2xl border bg-white" style={{ borderColor: colors.border }}>{["08:00 AM  ·  Amoxicillin 500mg", "08:00 PM  ·  Amoxicillin 500mg"].map((dose) => <View key={dose} className="flex-row items-center border-b border-slate-100 px-4 py-4"><View className="mr-3 h-5 w-5 rounded-md border-2 border-slate-300" /><Text className="text-sm font-semibold text-slate-700">{dose}</Text></View>)}</View>
-    </ScrollView>
-  );
-}
+const styles = StyleSheet.create({
+  rootContainer: {
+    flex: 1,
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingHorizontal: 18,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+    marginTop: 4,
+  },
+  greetingText: {
+    fontSize: 28,
+    fontWeight: "700",
+    letterSpacing: -0.5,
+  },
+  dateSubText: {
+    fontSize: 13,
+    fontWeight: "500",
+    marginTop: 1,
+  },
+  headerRightRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  syncPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: RADII.pill,
+    borderWidth: 1,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#10B981",
+  },
+  syncText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  themeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  bentoGrid: {
+    gap: 12,
+  },
+  bentoRow: {
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: 12,
+  },
+});

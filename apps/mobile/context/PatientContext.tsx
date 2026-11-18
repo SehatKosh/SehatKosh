@@ -32,8 +32,6 @@ export interface PatientTelemetry {
   glucoseMgDl: number;
   medicationsTaken: number;
   medicationsTotal: number;
-  medsTaken: number;
-  medsTotal: number;
 }
 
 export interface PatientContextType {
@@ -85,8 +83,6 @@ export const UNIFIED_TELEMETRY: PatientTelemetry = {
   glucoseMgDl: 94,
   medicationsTaken: 2,
   medicationsTotal: 2,
-  medsTaken: 2,
-  medsTotal: 2,
 };
 
 const PatientContext = createContext<PatientContextType>({
@@ -113,3 +109,4 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
 export function usePatient(): PatientContextType {
   return useContext(PatientContext);
 }
+

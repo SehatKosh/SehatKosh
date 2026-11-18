@@ -59,8 +59,12 @@ export function MetricDetailSheet({ data, onClose }: MetricDetailSheetProps) {
   const areaPath = `${linePath} L ${graphWidth} ${graphHeight} L 0 ${graphHeight} Z`;
 
   const handleAskAvi = () => {
+    const query = `Analyze my recent ${data.label} reading of ${data.currentValue} ${data.unit || ""}.`;
     onClose();
-    router.navigate("/(tabs)/chat");
+    router.navigate({
+      pathname: "/(tabs)/chat",
+      params: { initialQuery: query },
+    });
   };
 
   return (

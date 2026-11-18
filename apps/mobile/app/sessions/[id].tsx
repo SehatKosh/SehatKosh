@@ -9,19 +9,25 @@ import {
   Heart,
   Microscope,
 } from "lucide-react-native";
-import { Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getEncounterById } from "../../services/mockRecords";
+import { useTheme } from "../../context/ThemeContext";
 
-// ── SOAP section label → icon mapping ──────────────────────────────────────
 const SOAP_CONFIG = [
   {
     key: "subjective" as const,
     code: "S",
     label: "Subjective",
     sublabel: "Chief Complaints & Symptoms",
-    color: "text-sky-700 bg-sky-50 border-sky-200",
-    codeColor: "bg-sky-600",
+    color: "#0284C7",
     icon: <Stethoscope size={16} color="#0284C7" />,
   },
   {
@@ -29,8 +35,7 @@ const SOAP_CONFIG = [
     code: "O",
     label: "Objective",
     sublabel: "Vitals & Clinical Observations",
-    color: "text-violet-700 bg-violet-50 border-violet-200",
-    codeColor: "bg-violet-600",
+    color: "#7C3AED",
     icon: <Heart size={16} color="#7C3AED" />,
   },
   {
@@ -38,8 +43,7 @@ const SOAP_CONFIG = [
     code: "A",
     label: "Assessment",
     sublabel: "Diagnosis (ICD-10)",
-    color: "text-amber-700 bg-amber-50 border-amber-200",
-    codeColor: "bg-amber-500",
+    color: "#D97706",
     icon: <Microscope size={16} color="#D97706" />,
   },
   {
@@ -47,219 +51,565 @@ const SOAP_CONFIG = [
     code: "P",
     label: "Plan",
     sublabel: "Treatment & Follow-up Instructions",
-    color: "text-emerald-700 bg-emerald-50 border-emerald-200",
-    codeColor: "bg-emerald-600",
+    color: "#059669",
     icon: <ClipboardList size={16} color="#059669" />,
   },
 ] as const;
 
-// ── Encounter type badge color ──────────────────────────────────────────────
-const ENCOUNTER_BADGE: Record<string, string> = {
-  "Follow-up Consultation": "bg-sky-100 text-sky-700",
-  "Acute Consultation": "bg-red-100 text-red-700",
-  "Routine Health Checkup": "bg-emerald-100 text-emerald-700",
-  "Specialist Consultation": "bg-violet-100 text-violet-700",
-};
-
 export default function SessionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const topPadding = Math.max(insets.top, 16) + 8;
 
   const encounter = getEncounterById(id);
 
-  // ── 404 fallback ────────────────────────────────────────────────────────
   if (!encounter) {
     return (
       <View
-        className="flex-1 items-center justify-center bg-slate-50 px-8"
-        style={{ paddingTop: topPadding }}
+        style={[
+          styles.fallbackRoot,
+          { backgroundColor: colors.canvas, paddingTop: topPadding },
+        ]}
       >
-        <Text className="text-center text-lg font-bold text-slate-700">
+        <Text style={[styles.fallbackTitle, { color: colors.textPrimary }]}>
           Record not found
         </Text>
         <TouchableOpacity
           onPress={() => router.back()}
-          className="mt-4 rounded-xl bg-sky-600 px-6 py-3"
+          style={styles.fallbackBtn}
         >
-          <Text className="font-bold text-white">Go Back</Text>
+          <Text style={styles.fallbackBtnText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const badgeStyle =
-    ENCOUNTER_BADGE[encounter.encounterType] ?? "bg-slate-100 text-slate-700";
-
   return (
-    <ScrollView
-      className="flex-1 bg-slate-50"
-      contentContainerStyle={{
-        paddingTop: topPadding,
-        paddingHorizontal: 20,
-        paddingBottom: Math.max(insets.bottom, 16) + 24,
-      }}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* ── Back Button ─────────────────────────────────── */}
-      <TouchableOpacity
-        onPress={() => router.back()}
-        className="mb-4 h-11 w-11 items-center justify-center rounded-full bg-white border border-slate-200"
+    <View style={[styles.root, { backgroundColor: colors.canvas }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: topPadding,
+            paddingBottom: Math.max(insets.bottom, 16) + 40,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
       >
-        <ArrowLeft color="#475569" size={22} />
-      </TouchableOpacity>
+        {/* ── Back Button ─────────────────────────────────── */}
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={[
+            styles.backBtn,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <ArrowLeft color={colors.textPrimary} size={22} />
+        </TouchableOpacity>
 
-      {/* ── Encounter Header ─────────────────────────────── */}
-      <View className={`self-start rounded-full px-3 py-1 mb-3 ${badgeStyle}`}>
-        <Text className="text-xs font-bold">{encounter.encounterType}</Text>
-      </View>
-      <Text className="text-3xl font-bold text-slate-900">
-        {encounter.doctor}
-      </Text>
-      <Text className="mt-1 text-sm text-slate-500">
-        {encounter.facility} · {encounter.specialty}
-      </Text>
-      <Text className="mt-0.5 text-xs text-slate-400">{encounter.date}</Text>
-
-      {/* ── SOAP Note Card ───────────────────────────────── */}
-      <View className="mt-6 rounded-2xl border border-slate-200 bg-white overflow-hidden">
-        <View className="px-5 py-4 border-b border-slate-100">
-          <Text className="text-base font-bold text-slate-900">
-            Clinical SOAP Record
-          </Text>
-          <Text className="mt-0.5 text-xs text-slate-500">
-            Structured clinical note from this encounter
+        {/* ── Encounter Header ─────────────────────────────── */}
+        <View
+          style={[
+            styles.badge,
+            {
+              backgroundColor: isDark
+                ? "rgba(56, 189, 248, 0.15)"
+                : "#E0F2FE",
+              borderColor: isDark
+                ? "rgba(56, 189, 248, 0.3)"
+                : "#BAE6FD",
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.badgeText,
+              { color: isDark ? "#38BDF8" : "#0284C7" },
+            ]}
+          >
+            {encounter.encounterType}
           </Text>
         </View>
 
-        {SOAP_CONFIG.map((section, idx) => (
+        <Text style={[styles.doctorTitle, { color: colors.textPrimary }]}>
+          {encounter.doctor}
+        </Text>
+        <Text style={[styles.facilitySub, { color: colors.textSecondary }]}>
+          {encounter.facility} · {encounter.specialty}
+        </Text>
+        <Text style={[styles.dateSub, { color: colors.textMuted }]}>
+          {encounter.date}
+        </Text>
+
+        {/* ── SOAP Note Card ───────────────────────────────── */}
+        <View
+          style={[
+            styles.soapCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
           <View
-            key={section.key}
-            className={`px-5 py-4 ${
-              idx < SOAP_CONFIG.length - 1 ? "border-b border-slate-100" : ""
-            }`}
+            style={[
+              styles.soapHeader,
+              { borderBottomColor: colors.border },
+            ]}
           >
-            <View className="flex-row items-center gap-2 mb-2">
-              <View
-                className={`h-6 w-6 rounded-full items-center justify-center ${section.codeColor}`}
-              >
-                <Text className="text-xs font-black text-white">
-                  {section.code}
-                </Text>
-              </View>
-              <View>
-                <Text className="text-sm font-bold text-slate-900">
-                  {section.label}
-                </Text>
-                <Text className="text-xs text-slate-400">
-                  {section.sublabel}
-                </Text>
-              </View>
-            </View>
-            <Text className="text-sm leading-6 text-slate-700">
-              {encounter.soap[section.key]}
+            <Text style={[styles.soapTitle, { color: colors.textPrimary }]}>
+              Clinical SOAP Record
             </Text>
           </View>
-        ))}
-      </View>
 
-      {/* ── Prescribed Medications ───────────────────────── */}
-      {encounter.medications.length > 0 && (
-        <>
-          <Text className="mb-3 mt-7 text-lg font-bold text-slate-900">
-            Prescribed Medications
-          </Text>
-          {encounter.medications.map((med, idx) => (
+          {SOAP_CONFIG.map((section, idx) => (
             <View
-              key={`${med.name}-${idx}`}
-              className="mb-3 rounded-2xl border border-slate-200 bg-white p-4"
+              key={section.key}
+              style={[
+                styles.soapSection,
+                idx < SOAP_CONFIG.length - 1 && {
+                  borderBottomWidth: StyleSheet.hairlineWidth,
+                  borderBottomColor: colors.border,
+                },
+              ]}
             >
-              <View className="flex-row items-start justify-between">
-                <View className="flex-row items-center gap-3 flex-1">
-                  <View className="h-10 w-10 rounded-xl bg-sky-50 items-center justify-center">
-                    <Pill size={18} color="#0284C7" />
+              <View style={styles.soapSectionHeader}>
+                <View
+                  style={[
+                    styles.soapCodeBadge,
+                    { backgroundColor: section.color },
+                  ]}
+                >
+                  <Text style={styles.soapCodeText}>{section.code}</Text>
+                </View>
+                <View>
+                  <Text
+                    style={[
+                      styles.soapSectionLabel,
+                      { color: colors.textPrimary },
+                    ]}
+                  >
+                    {section.label}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.soapSectionSub,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {section.sublabel}
+                  </Text>
+                </View>
+              </View>
+              <Text
+                style={[
+                  styles.soapSectionBody,
+                  { color: colors.textPrimary },
+                ]}
+              >
+                {encounter.soap[section.key]}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* ── Prescribed Medications ───────────────────────── */}
+        {encounter.medications.length > 0 && (
+          <>
+            <Text
+              style={[
+                styles.sectionHeading,
+                { color: colors.textPrimary },
+              ]}
+            >
+              Prescribed Medications
+            </Text>
+            {encounter.medications.map((med, idx) => (
+              <View
+                key={`${med.name}-${idx}`}
+                style={[
+                  styles.medCard,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <View style={styles.medHeaderRow}>
+                  <View
+                    style={[
+                      styles.medIconBox,
+                      {
+                        backgroundColor: isDark
+                          ? "rgba(56, 189, 248, 0.15)"
+                          : "#E0F2FE",
+                      },
+                    ]}
+                  >
+                    <Pill
+                      size={18}
+                      color={isDark ? "#38BDF8" : "#0284C7"}
+                    />
                   </View>
-                  <View className="flex-1">
-                    <Text className="text-base font-bold text-slate-900">
+                  <View style={styles.medMeta}>
+                    <Text
+                      style={[
+                        styles.medName,
+                        { color: colors.textPrimary },
+                      ]}
+                    >
                       {med.name}
                     </Text>
-                    <Text className="text-xs text-slate-500">
+                    <Text
+                      style={[
+                        styles.medForm,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
                       {med.form} · {med.strength}
                     </Text>
                   </View>
                 </View>
-              </View>
-              <View className="mt-3 gap-1.5">
-                <View className="flex-row items-center gap-2">
-                  <Text className="w-20 text-xs font-semibold text-slate-500">
+
+                <View style={styles.medDetailRow}>
+                  <Text
+                    style={[
+                      styles.medDetailLabel,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
                     Frequency
                   </Text>
-                  <Text className="flex-1 text-sm text-slate-800">
+                  <Text
+                    style={[
+                      styles.medDetailVal,
+                      { color: colors.textPrimary },
+                    ]}
+                  >
                     {med.frequency}
                   </Text>
                 </View>
-                <View className="flex-row items-center gap-2">
-                  <Text className="w-20 text-xs font-semibold text-slate-500">
+                <View style={styles.medDetailRow}>
+                  <Text
+                    style={[
+                      styles.medDetailLabel,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
                     Duration
                   </Text>
-                  <Text className="flex-1 text-sm text-slate-800">
+                  <Text
+                    style={[
+                      styles.medDetailVal,
+                      { color: colors.textPrimary },
+                    ]}
+                  >
                     {med.duration}
                   </Text>
                 </View>
               </View>
-            </View>
-          ))}
-        </>
-      )}
+            ))}
+          </>
+        )}
 
-      {/* ── Attached Document ────────────────────────────── */}
-      {encounter.attachedDocument && (
-        <>
-          <Text className="mb-3 mt-7 text-lg font-bold text-slate-900">
-            Attached Document
+        {/* ── Attached Document ────────────────────────────── */}
+        {encounter.attachedDocument && (
+          <>
+            <Text
+              style={[
+                styles.sectionHeading,
+                { color: colors.textPrimary },
+              ]}
+            >
+              Attached Document
+            </Text>
+            <TouchableOpacity
+              onPress={() =>
+                Alert.alert(
+                  "Document Preview",
+                  "Tap to view the full-size scanned document."
+                )
+              }
+              activeOpacity={0.7}
+              style={[
+                styles.docCard,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(16, 185, 129, 0.12)"
+                    : "#ECFDF5",
+                  borderColor: isDark
+                    ? "rgba(16, 185, 129, 0.3)"
+                    : "#A7F3D0",
+                },
+              ]}
+            >
+              <View
+                style={[
+                  styles.docIconBox,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(16, 185, 129, 0.2)"
+                      : "#D1FAE5",
+                  },
+                ]}
+              >
+                <FileText size={22} color="#10B981" />
+              </View>
+              <View style={styles.docMeta}>
+                <Text
+                  style={[
+                    styles.docTitle,
+                    { color: isDark ? "#6EE7B7" : "#065F46" },
+                  ]}
+                >
+                  Prescription / Report Scan
+                </Text>
+                <Text
+                  style={[
+                    styles.docSub,
+                    { color: isDark ? "#A7F3D0" : "#047857" },
+                  ]}
+                >
+                  Tap to preview · Pinch to zoom
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </>
+        )}
+
+        {/* ── HL7 FHIR Export Button ───────────────────────── */}
+        <TouchableOpacity
+          onPress={() =>
+            Alert.alert(
+              "Export HL7 FHIR Standard",
+              `Preparing encounter ${id} as an HL7 FHIR R4 JSON bundle compatible with hospital EHR systems.`,
+              [{ text: "Cancel" }, { text: "Export & Share" }]
+            )
+          }
+          activeOpacity={0.7}
+          style={[
+            styles.exportBtn,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <FileCode2 size={18} color="#0284C7" />
+          <Text style={styles.exportBtnText}>
+            Export HL7 FHIR Standard (JSON)
           </Text>
-          <TouchableOpacity
-            onPress={() =>
-              Alert.alert(
-                "Document Preview",
-                "Tap to view the full-size scanned document."
-              )
-            }
-            className="flex-row items-center rounded-2xl border border-emerald-200 bg-emerald-50 p-4"
-            activeOpacity={0.7}
-          >
-            <View className="mr-4 h-12 w-12 items-center justify-center rounded-xl bg-emerald-100">
-              <FileText size={22} color="#059669" />
-            </View>
-            <View className="flex-1">
-              <Text className="font-bold text-emerald-900">
-                Prescription / Report Scan
-              </Text>
-              <Text className="mt-0.5 text-xs text-emerald-700">
-                Tap to preview · Pinch to zoom
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </>
-      )}
-
-      {/* ── HL7 FHIR Export Button ───────────────────────── */}
-      <TouchableOpacity
-        onPress={() =>
-          Alert.alert(
-            "Export HL7 FHIR Standard",
-            `Preparing encounter ${id} as an HL7 FHIR R4 JSON bundle compatible with hospital EHR systems.`,
-            [{ text: "Cancel" }, { text: "Export & Share" }]
-          )
-        }
-        className="mt-6 flex-row items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-4"
-        activeOpacity={0.7}
-      >
-        <FileCode2 size={18} color="#0284C7" />
-        <Text className="font-bold text-sky-700">
-          Export HL7 FHIR Standard (JSON)
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
+        </TouchableOpacity>
+      </ScrollView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 20,
+  },
+  fallbackRoot: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  fallbackTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  fallbackBtn: {
+    marginTop: 16,
+    borderRadius: 14,
+    backgroundColor: "#0284C7",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  fallbackBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  badge: {
+    alignSelf: "flex-start",
+    borderRadius: 9999,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginBottom: 10,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  doctorTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    letterSpacing: -0.5,
+  },
+  facilitySub: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  dateSub: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  soapCard: {
+    marginTop: 22,
+    borderRadius: 20,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  soapHeader: {
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  soapTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  soapSection: {
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+  },
+  soapSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 8,
+  },
+  soapCodeBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  soapCodeText: {
+    fontSize: 11,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  soapSectionLabel: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  soapSectionSub: {
+    fontSize: 11,
+  },
+  soapSectionBody: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  sectionHeading: {
+    fontSize: 17,
+    fontWeight: "700",
+    marginTop: 24,
+    marginBottom: 10,
+  },
+  medCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 10,
+  },
+  medHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 12,
+  },
+  medIconBox: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  medMeta: {
+    flex: 1,
+  },
+  medName: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  medForm: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  medDetailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  medDetailLabel: {
+    width: 80,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  medDetailVal: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  docCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+  },
+  docIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
+  },
+  docMeta: {
+    flex: 1,
+  },
+  docTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  docSub: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  exportBtn: {
+    marginTop: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 14,
+  },
+  exportBtnText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0284C7",
+  },
+});

@@ -5,15 +5,18 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "../../context/ThemeContext";
 
 export default function DoctorSessionScreen() {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const topPadding = Math.max(insets.top, 16) + 8;
 
   const [doctorName, setDoctorName] = useState("");
@@ -23,7 +26,6 @@ export default function DoctorSessionScreen() {
   const canProceed = doctorName.trim().length > 0;
 
   const handleSkip = () => {
-    // Save consultation only and navigate back
     router.back();
   };
 
@@ -33,89 +35,162 @@ export default function DoctorSessionScreen() {
 
   return (
     <KeyboardAvoidingView
-      className="flex-1 bg-slate-50"
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={[styles.root, { backgroundColor: colors.canvas }]}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
-        contentContainerStyle={{
-          padding: 20,
-          paddingTop: topPadding,
-          paddingBottom: Math.max(insets.bottom, 16) + 100,
-        }}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: topPadding,
+            paddingBottom: Math.max(insets.bottom, 16) + 120,
+          },
+        ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {/* ── Top Nav ─────────────────────────────────────── */}
-        <View className="mb-6 flex-row items-center justify-between">
+        <View style={styles.navRow}>
           <TouchableOpacity
             onPress={() => router.back()}
-            className="h-11 w-11 items-center justify-center rounded-full bg-white border border-slate-200"
+            style={[
+              styles.navBtn,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
           >
-            <X size={20} color="#475569" />
+            <X size={20} color={colors.textPrimary} />
           </TouchableOpacity>
-          <View className="flex-row items-center gap-1.5">
-            <View className="h-2 w-8 rounded-full bg-sky-600" />
-            <View className="h-2 w-2 rounded-full bg-slate-200" />
+          <View style={styles.stepDots}>
+            <View style={styles.stepDotActive} />
+            <View
+              style={[
+                styles.stepDotInactive,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(255,255,255,0.15)"
+                    : "#CBD5E1",
+                },
+              ]}
+            />
           </View>
-          <View className="w-11" />
+          <View style={styles.navBtnPlaceholder} />
         </View>
 
         {/* ── Step Label ──────────────────────────────────── */}
-        <Text className="text-xs font-bold uppercase tracking-wider text-sky-600">
+        <Text style={styles.stepLabel}>
           Step 1 of 2 · Consultation Intake
         </Text>
-        <Text className="mt-2 text-3xl font-bold text-slate-900">
+        <Text
+          style={[
+            styles.title,
+            { color: colors.textPrimary },
+          ]}
+        >
           Log doctor visit
-        </Text>
-        <Text className="mt-2 text-sm leading-5 text-slate-500">
-          Capture the important details while they are still fresh.
         </Text>
 
         {/* ── Doctor Name ─────────────────────────────────── */}
-        <Text className="mb-2 mt-8 text-sm font-semibold text-slate-700">
-          Doctor name <Text className="text-red-500">*</Text>
+        <Text
+          style={[
+            styles.inputLabel,
+            { color: colors.textPrimary },
+          ]}
+        >
+          Doctor name <Text style={styles.asterisk}>*</Text>
         </Text>
         <TextInput
           value={doctorName}
           onChangeText={setDoctorName}
           placeholder="e.g. Dr. Tariq Khan"
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={colors.textMuted}
           autoCapitalize="words"
-          className="rounded-xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-900"
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              color: colors.textPrimary,
+            },
+          ]}
         />
 
         {/* ── Specialty / Clinic ──────────────────────────── */}
-        <Text className="mb-2 mt-4 text-sm font-semibold text-slate-700">
+        <Text
+          style={[
+            styles.inputLabel,
+            { color: colors.textPrimary, marginTop: 18 },
+          ]}
+        >
           Specialty / clinic
         </Text>
         <TextInput
           value={clinic}
           onChangeText={setClinic}
           placeholder="e.g. Internal Medicine, Shifa Hospital"
-          placeholderTextColor="#94A3B8"
-          className="rounded-xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-900"
+          placeholderTextColor={colors.textMuted}
+          style={[
+            styles.input,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              color: colors.textPrimary,
+            },
+          ]}
         />
 
         {/* ── Discussion Notes ─────────────────────────────── */}
-        <View className="mt-7 rounded-2xl border border-slate-200 bg-white p-4">
-          <Text className="text-lg font-bold text-slate-900">
+        <View
+          style={[
+            styles.notesCard,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Text
+            style={[
+              styles.notesTitle,
+              { color: colors.textPrimary },
+            ]}
+          >
             What was discussed?
-          </Text>
-          <Text className="mt-1 text-sm leading-5 text-slate-500">
-            Mention symptoms, the diagnosis, and any medication changes.
           </Text>
           <TextInput
             value={notes}
             onChangeText={setNotes}
             multiline
             textAlignVertical="top"
-            placeholder="Tell us in plain words..."
-            placeholderTextColor="#94A3B8"
-            className="mt-4 h-44 rounded-xl bg-slate-50 p-4 text-sm text-slate-900"
+            placeholder="Tell us symptoms, diagnosis, and advice in plain words..."
+            placeholderTextColor={colors.textMuted}
+            style={[
+              styles.notesInput,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+                color: colors.textPrimary,
+              },
+            ]}
           />
-          <TouchableOpacity className="mt-4 flex-row items-center justify-center gap-2 rounded-xl border border-sky-200 py-3">
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[
+              styles.voiceBtn,
+              {
+                backgroundColor: isDark
+                  ? "rgba(56, 189, 248, 0.1)"
+                  : "#F0F9FF",
+                borderColor: isDark
+                  ? "rgba(56, 189, 248, 0.3)"
+                  : "#BAE6FD",
+              },
+            ]}
+          >
             <Mic size={18} color="#0284C7" />
-            <Text className="text-sm font-semibold text-sky-700">
+            <Text style={styles.voiceBtnText}>
               Hold to record consultation notes
             </Text>
           </TouchableOpacity>
@@ -124,38 +199,211 @@ export default function DoctorSessionScreen() {
 
       {/* ── Sticky Bottom CTAs ────────────────────────────── */}
       <View
-        style={{ paddingBottom: Math.max(insets.bottom, 16) }}
-        className="absolute bottom-0 left-0 right-0 border-t border-slate-200 bg-white/95 px-5 pt-4"
+        style={[
+          styles.bottomBar,
+          {
+            backgroundColor: colors.surface,
+            borderTopColor: colors.border,
+            paddingBottom: Math.max(insets.bottom, 16),
+          },
+        ]}
       >
         {/* Primary: Proceed to scan */}
         <TouchableOpacity
           disabled={!canProceed}
           onPress={handleProceed}
-          className={`flex-row items-center justify-center gap-2 rounded-xl py-4 ${
-            canProceed ? "bg-sky-600" : "bg-slate-200"
-          }`}
+          activeOpacity={0.8}
+          style={[
+            styles.primaryBtn,
+            {
+              backgroundColor: canProceed
+                ? "#0284C7"
+                : isDark
+                ? "rgba(255,255,255,0.08)"
+                : "#E2E8F0",
+            },
+          ]}
         >
-          <ScanLine size={18} color={canProceed ? "#FFFFFF" : "#94A3B8"} />
+          <ScanLine
+            size={18}
+            color={canProceed ? "#FFFFFF" : colors.textMuted}
+          />
           <Text
-            className={`font-bold text-base ${
-              canProceed ? "text-white" : "text-slate-400"
-            }`}
+            style={[
+              styles.primaryBtnText,
+              {
+                color: canProceed ? "#FFFFFF" : colors.textMuted,
+              },
+            ]}
           >
             Proceed to Attach Prescription
           </Text>
-          <ChevronRight size={18} color={canProceed ? "#FFFFFF" : "#94A3B8"} />
+          <ChevronRight
+            size={18}
+            color={canProceed ? "#FFFFFF" : colors.textMuted}
+          />
         </TouchableOpacity>
 
         {/* Secondary: Skip document */}
         <TouchableOpacity
           onPress={handleSkip}
-          className="mt-2 py-3"
+          activeOpacity={0.7}
+          style={[
+            styles.secondaryBtn,
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
+            },
+          ]}
         >
-          <Text className="text-center text-sm font-semibold text-slate-500">
-            Skip Document & Save Consultation Only
+          <Text
+            style={[
+              styles.secondaryBtnText,
+              { color: colors.textSecondary },
+            ]}
+          >
+            Save consultation without document
           </Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  content: {
+    paddingHorizontal: 20,
+  },
+  navRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+  navBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  navBtnPlaceholder: {
+    width: 44,
+  },
+  stepDots: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  stepDotActive: {
+    height: 8,
+    width: 32,
+    borderRadius: 4,
+    backgroundColor: "#0284C7",
+  },
+  stepDotInactive: {
+    height: 8,
+    width: 8,
+    borderRadius: 4,
+  },
+  stepLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    color: "#0284C7",
+  },
+  title: {
+    fontSize: 30,
+    fontWeight: "700",
+    letterSpacing: -0.5,
+    marginTop: 6,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginTop: 24,
+    marginBottom: 8,
+  },
+  asterisk: {
+    color: "#EF4444",
+  },
+  input: {
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+  },
+  notesCard: {
+    marginTop: 24,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+  },
+  notesTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 12,
+  },
+  notesInput: {
+    height: 140,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 14,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  voiceBtn: {
+    marginTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    paddingVertical: 12,
+  },
+  voiceBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#0284C7",
+  },
+  bottomBar: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    borderTopWidth: 1,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    gap: 8,
+  },
+  primaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderRadius: 16,
+    paddingVertical: 15,
+  },
+  primaryBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  secondaryBtn: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingVertical: 12,
+  },
+  secondaryBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+});

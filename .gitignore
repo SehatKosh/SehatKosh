@@ -14,8 +14,6 @@ ios/
 *.pem
 *.tsbuildinfo
 .turbo/
-.env
-.env.local
 .env.*.local
 !.env.example
 !**/.env.example

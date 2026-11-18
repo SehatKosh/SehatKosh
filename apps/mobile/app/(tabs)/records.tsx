@@ -1,21 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Plus,
-  Search,
-  ChevronRight,
   Activity,
-  Droplets,
-  Ruler,
-  Weight,
-  ShieldCheck,
+  CheckCircle2,
+  ChevronRight,
   Clock,
   CloudOff,
-  CheckCircle2,
+  Droplets,
+  Plus,
   RefreshCw,
+  Ruler,
+  Search,
+  ShieldCheck,
+  Weight,
 } from "lucide-react-native";
 import {
   RefreshControl,
   ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -23,133 +24,32 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import BottomSheet from "@gorhom/bottom-sheet";
+import { useTheme } from "../../context/ThemeContext";
+import { usePatient } from "../../context/PatientContext";
 import {
+  ClinicalEncounter,
   MOCK_RECORDS,
   groupByMonth,
-  type ClinicalEncounter,
 } from "../../services/mockRecords";
 import {
-  getPatientEncounters,
   DEFAULT_PATIENT_ID,
+  getPatientEncounters,
 } from "../../services/apiClient";
 import {
+  OfflineScanItem,
   getOfflineQueue,
   startAutoSyncListener,
-  syncOfflineItem,
-  type OfflineScanItem,
 } from "../../services/offlineQueue";
-import { AllergyModal, type Allergy } from "../../components/AllergyModal";
+import { Allergy, AllergyModal, AllergyModalHandle } from "../../components/AllergyModal";
 
-// ── Specialty badge colors ─────────────────────────────────────────────────
-const SPECIALTY_COLOR: Record<string, string> = {
-  Cardiology: "text-red-700 bg-red-50 border-red-200",
-  Pulmonology: "text-sky-700 bg-sky-50 border-sky-200",
-  "Internal Medicine": "text-violet-700 bg-violet-50 border-violet-200",
-  Dermatology: "text-amber-700 bg-amber-50 border-amber-200",
-};
-
-const TAG_COLOR: Record<string, string> = {
-  sky: "bg-sky-50 text-sky-700",
-  emerald: "bg-emerald-50 text-emerald-700",
-  amber: "bg-amber-50 text-amber-700",
-  violet: "bg-violet-50 text-violet-700",
-};
-
-// ── Encounter Card ──────────────────────────────────────────────────────────
-function EncounterCard({ encounter }: { encounter: ClinicalEncounter }) {
-  const specialtyStyle =
-    SPECIALTY_COLOR[encounter.specialty] ??
-    "text-slate-700 bg-slate-100 border-slate-200";
-
-  return (
-    <TouchableOpacity
-      onPress={() =>
-        router.push({ pathname: "/sessions/[id]", params: { id: encounter.id } })
-      }
-      activeOpacity={0.75}
-      className="mb-3 rounded-2xl border border-slate-200 bg-white p-4"
-    >
-      {/* Top row */}
-      <View className="flex-row items-start justify-between">
-        <View className="flex-1 pr-3">
-          <Text className="text-base font-bold text-slate-900">
-            {encounter.doctor}
-          </Text>
-          <Text className="mt-0.5 text-sm text-slate-500">
-            {encounter.facility}
-          </Text>
-        </View>
-        <View className="items-end gap-1">
-          <Text className="text-xs text-slate-400">{encounter.date}</Text>
-          <View className={`rounded-full border px-2 py-0.5 ${specialtyStyle}`}>
-            <Text className="text-xs font-semibold">{encounter.specialty}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Tags */}
-      <View className="mt-3 flex-row flex-wrap gap-2">
-        {encounter.tags.map((tag) => (
-          <View
-            key={tag.label}
-            className={`rounded-full px-3 py-1 ${TAG_COLOR[tag.color]}`}
-          >
-            <Text className="text-xs font-semibold">{tag.label}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Summary */}
-      <Text className="mt-3 text-sm leading-5 text-slate-600" numberOfLines={2}>
-        {encounter.summary}
-      </Text>
-
-      {/* Navigate chevron */}
-      <View className="mt-3 flex-row items-center justify-end">
-        <Text className="mr-1 text-xs font-semibold text-sky-600">
-          View full record
-        </Text>
-        <ChevronRight size={14} color="#0284C7" />
-      </View>
-    </TouchableOpacity>
-  );
-}
-
-// ── Vitals Grid Card ────────────────────────────────────────────────────────
-function VitalTile({
-  icon,
-  label,
-  value,
-  badge,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  badge?: { text: string; color: string };
-}) {
-  return (
-    <View className="flex-1 rounded-2xl border border-slate-200 bg-white p-4">
-      <View className="mb-2">{icon}</View>
-      <Text className="text-xs font-semibold text-slate-500">{label}</Text>
-      <Text className="mt-1 text-lg font-bold text-slate-900">{value}</Text>
-      {badge && (
-        <View
-          className={`mt-1.5 self-start rounded-full px-2 py-0.5 ${badge.color}`}
-        >
-          <Text className="text-xs font-semibold">{badge.text}</Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
-// ── Main Screen ─────────────────────────────────────────────────────────────
 export default function RecordsScreen() {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
+  const { patient } = usePatient();
+
   const [activeTab, setActiveTab] = useState<"history" | "profile">("history");
   const [search, setSearch] = useState("");
-  const allergyModalRef = useRef<BottomSheet>(null);
+  const allergyModalRef = useRef<AllergyModalHandle>(null);
 
   const [encounters, setEncounters] = useState<ClinicalEncounter[]>(MOCK_RECORDS);
   const [offlineQueue, setOfflineQueue] = useState<OfflineScanItem[]>([]);
@@ -157,7 +57,10 @@ export default function RecordsScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLiveSync, setIsLiveSync] = useState(false);
 
-  const topPadding = Math.max(insets.top, 16) + 8;
+  const [allergies, setAllergies] = useState<(Allergy & { id: string })[]>([
+    { id: "a1", allergen: "Penicillin", reaction: "Severe Anaphylaxis", severity: "Severe" },
+    { id: "a2", allergen: "Sulfa Drugs", reaction: "Cutaneous Rash", severity: "Moderate" },
+  ]);
 
   const loadEncounters = useCallback(async (isPull = false) => {
     if (isPull) {
@@ -173,7 +76,6 @@ export default function RecordsScreen() {
       const patientId = DEFAULT_PATIENT_ID;
       const liveList = await getPatientEncounters(patientId);
       if (liveList && liveList.length > 0) {
-        // Merge live encounters with mock records, giving precedence to live records
         const liveIds = new Set(liveList.map((e) => e.id));
         const merged = [...liveList, ...MOCK_RECORDS.filter((m) => !liveIds.has(m.id))];
         setEncounters(merged);
@@ -181,8 +83,7 @@ export default function RecordsScreen() {
       } else {
         setEncounters(MOCK_RECORDS);
       }
-    } catch (err: unknown) {
-      console.warn("[records] Live encounter query failed, using baseline records:", err);
+    } catch {
       setEncounters(MOCK_RECORDS);
     } finally {
       setIsLoading(false);
@@ -194,7 +95,6 @@ export default function RecordsScreen() {
     loadEncounters();
   }, [loadEncounters]);
 
-  // Network reconnection auto-sync listener
   useEffect(() => {
     const unsubscribe = startAutoSyncListener(() => {
       getOfflineQueue().then(setOfflineQueue);
@@ -202,12 +102,6 @@ export default function RecordsScreen() {
     });
     return () => unsubscribe();
   }, [loadEncounters]);
-
-  // Allergy state — initialised with existing profile allergies
-  const [allergies, setAllergies] = useState<(Allergy & { id: string })[]>([
-    { id: "a1", allergen: "Penicillin", reaction: "Anaphylaxis", severity: "Severe" },
-    { id: "a2", allergen: "NSAIDs", reaction: "Skin Rash", severity: "Mild" },
-  ]);
 
   const handleAddAllergy = (allergy: Allergy) => {
     setAllergies((prev) => [
@@ -219,329 +113,546 @@ export default function RecordsScreen() {
   const groupedRecords = groupByMonth(encounters);
 
   const filteredGroups = search.trim()
-    ? groupedRecords.map(({ month, encounters: groupEncounters }) => ({
-        month,
-        encounters: groupEncounters.filter(
-          (e) =>
-            e.doctor.toLowerCase().includes(search.toLowerCase()) ||
-            e.specialty.toLowerCase().includes(search.toLowerCase()) ||
-            e.facility.toLowerCase().includes(search.toLowerCase())
-        ),
-      })).filter(({ encounters: groupEncounters }) => groupEncounters.length > 0)
+    ? groupedRecords
+        .map(({ month, encounters: groupEncounters }) => ({
+          month,
+          encounters: groupEncounters.filter(
+            (e) =>
+              e.doctor.toLowerCase().includes(search.toLowerCase()) ||
+              e.specialty.toLowerCase().includes(search.toLowerCase()) ||
+              e.facility.toLowerCase().includes(search.toLowerCase())
+          ),
+        }))
+        .filter(({ encounters: groupEncounters }) => groupEncounters.length > 0)
     : groupedRecords;
 
-  const allergyChipStyle: Record<Allergy["severity"], string> = {
-    Severe: "bg-red-50 border-red-200",
-    Moderate: "bg-orange-50 border-orange-200",
-    Mild: "bg-amber-50 border-amber-200",
-  };
-  const allergyTextStyle: Record<Allergy["severity"], string> = {
-    Severe: "text-red-700",
-    Moderate: "text-orange-700",
-    Mild: "text-amber-700",
-  };
+  const topPadding = Math.max(insets.top, 16);
 
   return (
-    <>
+    <View style={[styles.rootContainer, { backgroundColor: colors.canvas }]}>
       <ScrollView
-        className="flex-1 bg-slate-50"
-        contentContainerStyle={{
-          paddingTop: topPadding,
-          paddingHorizontal: 20,
-          paddingBottom: 32,
-        }}
+        style={styles.scrollContainer}
+        contentContainerStyle={[
+          styles.contentContainer,
+          { paddingTop: topPadding, paddingBottom: 120 },
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={() => loadEncounters(true)}
-            tintColor="#0284C7"
-            colors={["#0284C7"]}
+            tintColor={colors.tabBarActive}
+            colors={[colors.tabBarActive]}
           />
         }
       >
-        {/* ── Page Header ─────────────────────────────────── */}
-        <Text className="text-3xl font-bold text-slate-900">Records</Text>
-        <View className="mt-1 flex-row items-center justify-between">
-          <Text className="text-sm text-slate-500">
-            Your clinical history and health profile
-          </Text>
+        {/* ── Page Header ──────────────────────────────────────────────── */}
+        <View style={styles.headerRow}>
+          <View>
+            <Text
+              style={[
+                styles.titleText,
+                { color: colors.textPrimary },
+              ]}
+            >
+              Records
+            </Text>
+            <Text
+              style={[
+                styles.subtitleText,
+                { color: colors.textSecondary },
+              ]}
+            >
+              Clinical history and health profile
+            </Text>
+          </View>
+
           {isLiveSync && (
-            <View className="flex-row items-center rounded-full bg-emerald-50 px-2 py-0.5 border border-emerald-200">
-              <View className="mr-1.5 h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              <Text className="text-[10px] font-bold text-emerald-700">Live PostgreSQL</Text>
+            <View
+              style={[
+                styles.syncBadge,
+                {
+                  backgroundColor: isDark
+                    ? "rgba(16, 185, 129, 0.15)"
+                    : "#ECFDF5",
+                  borderColor: isDark ? "#059669" : "#A7F3D0",
+                },
+              ]}
+            >
+              <View style={styles.syncDot} />
+              <Text style={styles.syncBadgeText}>Live</Text>
             </View>
           )}
         </View>
 
-        {/* ── Segment Control ──────────────────────────────── */}
-        <View className="mt-6 flex-row rounded-xl bg-slate-200 p-1">
+        {/* ── Segment Toggle ───────────────────────────────────────────── */}
+        <View
+          style={[
+            styles.segmentContainer,
+            {
+              backgroundColor: isDark ? "#141822" : "#E2E8F0",
+              borderColor: colors.border,
+            },
+          ]}
+        >
           <TouchableOpacity
             onPress={() => setActiveTab("history")}
-            className={`flex-1 rounded-lg py-3 ${
-              activeTab === "history" ? "bg-white shadow-sm" : ""
-            }`}
+            activeOpacity={0.8}
+            style={[
+              styles.segmentBtn,
+              activeTab === "history" && [
+                styles.segmentBtnActive,
+                {
+                  backgroundColor: isDark ? "#1E2536" : "#FFFFFF",
+                  borderColor: isDark ? colors.border : "#CBD5E1",
+                },
+              ],
+            ]}
           >
-            <Text className="text-center text-sm font-semibold text-slate-700">
+            <Text
+              style={[
+                styles.segmentText,
+                {
+                  color:
+                    activeTab === "history"
+                      ? colors.textPrimary
+                      : colors.textSecondary,
+                  fontWeight: activeTab === "history" ? "700" : "500",
+                },
+              ]}
+            >
               Clinical History
             </Text>
           </TouchableOpacity>
+
           <TouchableOpacity
             onPress={() => setActiveTab("profile")}
-            className={`flex-1 rounded-lg py-3 ${
-              activeTab === "profile" ? "bg-white shadow-sm" : ""
-            }`}
+            activeOpacity={0.8}
+            style={[
+              styles.segmentBtn,
+              activeTab === "profile" && [
+                styles.segmentBtnActive,
+                {
+                  backgroundColor: isDark ? "#1E2536" : "#FFFFFF",
+                  borderColor: isDark ? colors.border : "#CBD5E1",
+                },
+              ],
+            ]}
           >
-            <Text className="text-center text-sm font-semibold text-slate-700">
+            <Text
+              style={[
+                styles.segmentText,
+                {
+                  color:
+                    activeTab === "profile"
+                      ? colors.textPrimary
+                      : colors.textSecondary,
+                  fontWeight: activeTab === "profile" ? "700" : "500",
+                },
+              ]}
+            >
               Health Profile
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* ════════════════════════════════════════════════════
-            TAB 1: Clinical History
-        ═══════════════════════════════════════════════════════ */}
-        {activeTab === "history" && (
+        {/* ── Tab 1: Clinical History ──────────────────────────────────── */}
+        {activeTab === "history" ? (
           <>
-            {/* ── Offline Document Queue (FR-EMR-04) ──────────── */}
-            {offlineQueue.length > 0 && (
-              <View className="mt-4 rounded-2xl border border-slate-200 bg-white p-3.5 space-y-2.5">
-                <View className="flex-row items-center justify-between pb-1 border-b border-slate-100">
-                  <View className="flex-row items-center gap-1.5">
-                    <CloudOff size={14} color="#64748B" />
-                    <Text className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                      Offline Document Queue ({offlineQueue.length})
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    onPress={async () => {
-                      for (const item of offlineQueue) {
-                        await syncOfflineItem(item);
-                      }
-                      const updated = await getOfflineQueue();
-                      setOfflineQueue(updated);
-                    }}
-                  >
-                    <Text className="text-xs font-semibold text-sky-600">Sync All</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {offlineQueue.map((item) => {
-                  const isSynced = item.status === "SYNCED";
-                  const isSyncing = item.status === "SYNCING";
-
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      activeOpacity={0.8}
-                      onPress={() => {
-                        if (isSynced && item.extractionResult) {
-                          router.push({
-                            pathname: "/intake/ocr-verify",
-                            params: {
-                              imageUri: item.localUri,
-                              extraction: JSON.stringify(item.extractionResult),
-                            },
-                          });
-                        } else if (!isSyncing) {
-                          syncOfflineItem(item).then(() => {
-                            getOfflineQueue().then(setOfflineQueue);
-                          });
-                        }
-                      }}
-                      className={`rounded-xl border p-3 ${
-                        isSynced
-                          ? "border-emerald-200 bg-emerald-50/60"
-                          : isSyncing
-                          ? "border-sky-200 bg-sky-50/60"
-                          : "border-amber-200 bg-amber-50/60"
-                      }`}
-                    >
-                      <View className="flex-row items-center justify-between">
-                        <View className="flex-row items-center gap-2.5 flex-1 pr-2">
-                          <View
-                            className={`h-7 w-7 rounded-full items-center justify-center ${
-                              isSynced
-                                ? "bg-emerald-100"
-                                : isSyncing
-                                ? "bg-sky-100"
-                                : "bg-amber-100"
-                            }`}
-                          >
-                            {isSynced ? (
-                              <CheckCircle2 size={15} color="#059669" />
-                            ) : isSyncing ? (
-                              <RefreshCw size={15} color="#0284C7" />
-                            ) : (
-                              <Clock size={15} color="#D97706" />
-                            )}
-                          </View>
-                          <View className="flex-1">
-                            <Text className="text-xs font-bold text-slate-900">
-                              Prescription Document
-                            </Text>
-                            <Text className="text-[10px] text-slate-500">
-                              Captured {new Date(item.capturedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                            </Text>
-                          </View>
-                        </View>
-
-                        <View
-                          className={`rounded-full px-2 py-0.5 border ${
-                            isSynced
-                              ? "bg-emerald-100 border-emerald-200"
-                              : isSyncing
-                              ? "bg-sky-100 border-sky-200"
-                              : "bg-amber-100 border-amber-200"
-                          }`}
-                        >
-                          <Text
-                            className={`text-[10px] font-bold ${
-                              isSynced
-                                ? "text-emerald-800"
-                                : isSyncing
-                                ? "text-sky-800"
-                                : "text-amber-800"
-                            }`}
-                          >
-                            {isSynced
-                              ? "Digitized • Tap to Verify Meds"
-                              : isSyncing
-                              ? "Digitizing via Vision OCR..."
-                              : "Not Digitized • Saved Offline (Waiting for Internet)"}
-                          </Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            )}
-
-            {/* Search bar */}
-            <View className="mt-5 flex-row items-center rounded-xl border border-slate-200 bg-white px-3">
-              <Search size={19} color="#94A3B8" />
+            {/* Search Input */}
+            <View
+              style={[
+                styles.searchBar,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Search size={18} color={colors.textSecondary} />
               <TextInput
                 value={search}
                 onChangeText={setSearch}
-                placeholder="Search doctor, specialty, facility..."
-                placeholderTextColor="#94A3B8"
-                className="flex-1 px-3 py-3 text-sm text-slate-800"
+                placeholder="Search doctor, hospital, condition..."
+                placeholderTextColor={colors.textMuted}
+                style={[
+                  styles.searchInput,
+                  { color: colors.textPrimary },
+                ]}
               />
             </View>
 
-            {/* Zero-flicker loading skeleton */}
-            {isLoading && !isRefreshing && (
-              <View className="mt-5 gap-3">
-                <View className="h-28 rounded-2xl border border-slate-200 bg-white p-4 opacity-70">
-                  <View className="h-4 w-1/3 rounded bg-slate-200" />
-                  <View className="mt-2 h-3 w-1/2 rounded bg-slate-100" />
-                  <View className="mt-4 h-3 w-full rounded bg-slate-100" />
-                </View>
-                <View className="h-28 rounded-2xl border border-slate-200 bg-white p-4 opacity-40">
-                  <View className="h-4 w-1/4 rounded bg-slate-200" />
-                  <View className="mt-2 h-3 w-2/5 rounded bg-slate-100" />
-                  <View className="mt-4 h-3 w-full rounded bg-slate-100" />
-                </View>
+            {/* Offline Sync Banner if items in queue */}
+            {offlineQueue.length > 0 && (
+              <View
+                style={[
+                  styles.offlineBanner,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(245, 158, 11, 0.15)"
+                      : "#FFFBEB",
+                    borderColor: isDark ? "#D97706" : "#FDE68A",
+                  },
+                ]}
+              >
+                <CloudOff size={16} color="#F59E0B" />
+                <Text
+                  style={[
+                    styles.offlineText,
+                    { color: isDark ? "#FCD34D" : "#B45309" },
+                  ]}
+                >
+                  {offlineQueue.length} document(s) queued for offline sync
+                </Text>
               </View>
             )}
 
-            {/* Encounter groups */}
+            {/* Encounters List Grouped by Month */}
             {filteredGroups.map(({ month, encounters: groupList }) => (
-              <View key={month}>
-                <Text className="mb-3 mt-6 text-lg font-bold text-slate-900">
+              <View key={month} style={styles.monthSection}>
+                <Text
+                  style={[
+                    styles.monthTitle,
+                    { color: colors.textSecondary },
+                  ]}
+                >
                   {month}
                 </Text>
+
                 {groupList.map((encounter) => (
-                  <EncounterCard key={encounter.id} encounter={encounter} />
+                  <TouchableOpacity
+                    key={encounter.id}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/sessions/[id]",
+                        params: { id: encounter.id },
+                      })
+                    }
+                    activeOpacity={0.75}
+                    style={[
+                      styles.encounterCard,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <View style={styles.cardHeaderRow}>
+                      <View style={styles.cardDoctorMeta}>
+                        <Text
+                          style={[
+                            styles.doctorName,
+                            { color: colors.textPrimary },
+                          ]}
+                        >
+                          {encounter.doctor}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.facilityName,
+                            { color: colors.textSecondary },
+                          ]}
+                        >
+                          {encounter.facility}
+                        </Text>
+                      </View>
+
+                      <View style={styles.cardSpecialtyCol}>
+                        <Text
+                          style={[
+                            styles.dateText,
+                            { color: colors.textMuted },
+                          ]}
+                        >
+                          {encounter.date}
+                        </Text>
+                        <View
+                          style={[
+                            styles.specialtyBadge,
+                            {
+                              backgroundColor: isDark ? "#1C2230" : "#F1F5F9",
+                              borderColor: colors.border,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.specialtyText,
+                              { color: colors.tabBarActive },
+                            ]}
+                          >
+                            {encounter.specialty}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* Tags */}
+                    <View style={styles.tagRow}>
+                      {encounter.tags.map((tag) => (
+                        <View
+                          key={tag.label}
+                          style={[
+                            styles.tagBadge,
+                            {
+                              backgroundColor: isDark
+                                ? "rgba(56, 189, 248, 0.12)"
+                                : "#F0F9FF",
+                              borderColor: isDark
+                                ? "rgba(56, 189, 248, 0.3)"
+                                : "#BAE6FD",
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.tagText,
+                              {
+                                color: isDark
+                                  ? "#7DD3FC"
+                                  : "#0369A1",
+                              },
+                            ]}
+                          >
+                            {tag.label}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+
+                    {/* Summary */}
+                    <Text
+                      style={[
+                        styles.summaryText,
+                        { color: colors.textSecondary },
+                      ]}
+                      numberOfLines={2}
+                    >
+                      {encounter.summary}
+                    </Text>
+
+                    {/* Action link */}
+                    <View style={styles.viewRecordRow}>
+                      <Text
+                        style={[
+                          styles.viewRecordText,
+                          { color: colors.tabBarActive },
+                        ]}
+                      >
+                        View Full Record
+                      </Text>
+                      <ChevronRight size={14} color={colors.tabBarActive} />
+                    </View>
+                  </TouchableOpacity>
                 ))}
               </View>
             ))}
-
-            {!isLoading && filteredGroups.length === 0 && (
-              <View className="mt-12 items-center">
-                <ShieldCheck size={32} color="#CBD5E1" />
-                <Text className="mt-3 text-center text-sm text-slate-400">
-                  No records match your search.
-                </Text>
-              </View>
-            )}
           </>
-        )}
+        ) : (
+          /* ── Tab 2: Health Profile ─────────────────────────────────── */
+          <View style={styles.profileTabWrapper}>
+            {/* Patient Header Card */}
+            <View
+              style={[
+                styles.profileHeaderCard,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <View style={styles.profileAvatarRow}>
+                <View
+                  style={[
+                    styles.avatarCircle,
+                    {
+                      backgroundColor: isDark ? "#1E293B" : "#E0F2FE",
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.avatarInitials,
+                      { color: colors.tabBarActive },
+                    ]}
+                  >
+                    {patient.initials}
+                  </Text>
+                </View>
 
-        {/* ════════════════════════════════════════════════════
-            TAB 2: Health Profile
-        ═══════════════════════════════════════════════════════ */}
-        {activeTab === "profile" && (
-          <>
-            {/* ── Physiological Vitals 2×2 Grid ──────────── */}
-            <Text className="mb-3 mt-7 text-lg font-bold text-slate-900">
-              Physiological Baseline
-            </Text>
-            <View className="gap-3">
-              <View className="flex-row gap-3">
-                <VitalTile
-                  icon={<Ruler size={20} color="#0284C7" />}
-                  label="Height"
-                  value="178 cm"
-                />
-                <VitalTile
-                  icon={<Weight size={20} color="#7C3AED" />}
-                  label="Weight"
-                  value="74.5 kg"
-                />
-              </View>
-              <View className="flex-row gap-3">
-                <VitalTile
-                  icon={<Activity size={20} color="#10B981" />}
-                  label="BMI"
-                  value="23.5"
-                  badge={{ text: "Normal Range", color: "bg-emerald-50 text-emerald-700" }}
-                />
-                <VitalTile
-                  icon={<Droplets size={20} color="#EF4444" />}
-                  label="Blood Group"
-                  value="O Positive"
-                />
+                <View>
+                  <Text
+                    style={[
+                      styles.patientFullName,
+                      { color: colors.textPrimary },
+                    ]}
+                  >
+                    {patient.fullName}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.patientMeta,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {patient.gender} • {patient.age} yrs • UHID: {patient.uhid}
+                  </Text>
+                </View>
               </View>
             </View>
 
-            {/* ── Allergies & Sensitivities ───────────────── */}
-            <View className="mb-3 mt-8 flex-row items-center justify-between">
-              <Text className="text-lg font-bold text-slate-900">
-                Allergies & Sensitivities
+            {/* Demographics Grid */}
+            <View style={styles.vitalsRow}>
+              <View
+                style={[
+                  styles.vitalsCard,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Droplets size={20} color="#EF4444" />
+                <Text
+                  style={[
+                    styles.vitalsLabel,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  Blood Group
+                </Text>
+                <Text
+                  style={[
+                    styles.vitalsValue,
+                    { color: colors.textPrimary },
+                  ]}
+                >
+                  {patient.bloodGroup}
+                </Text>
+              </View>
+
+              <View
+                style={[
+                  styles.vitalsCard,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <Weight size={20} color="#3B82F6" />
+                <Text
+                  style={[
+                    styles.vitalsLabel,
+                    { color: colors.textSecondary },
+                  ]}
+                >
+                  Weight
+                </Text>
+                <Text
+                  style={[
+                    styles.vitalsValue,
+                    { color: colors.textPrimary },
+                  ]}
+                >
+                  74.5 kg
+                </Text>
+              </View>
+            </View>
+
+            {/* Allergies & Sensitivities */}
+            <View style={styles.sectionHeaderRow}>
+              <Text
+                style={[
+                  styles.sectionTitle,
+                  { color: colors.textPrimary },
+                ]}
+              >
+                Documented Allergies
               </Text>
               <TouchableOpacity
                 onPress={() => allergyModalRef.current?.snapToIndex(0)}
-                className="flex-row items-center gap-1 rounded-full bg-sky-50 px-3 py-1.5"
+                activeOpacity={0.7}
+                style={[
+                  styles.addAllergyBtn,
+                  {
+                    backgroundColor: isDark ? "#1C2230" : "#F0F9FF",
+                    borderColor: colors.border,
+                  },
+                ]}
               >
-                <Plus size={14} color="#0284C7" />
-                <Text className="text-xs font-bold text-sky-700">
+                <Plus size={13} color={colors.tabBarActive} />
+                <Text
+                  style={[
+                    styles.addAllergyText,
+                    { color: colors.tabBarActive },
+                  ]}
+                >
                   Add Allergy
                 </Text>
               </TouchableOpacity>
             </View>
 
-            <View className="flex-row flex-wrap gap-3">
+            <View style={styles.allergiesGrid}>
               {allergies.map((allergy) => (
                 <View
                   key={allergy.id}
-                  className={`rounded-full border px-4 py-2.5 ${allergyChipStyle[allergy.severity]}`}
+                  style={[
+                    styles.allergyCard,
+                    {
+                      backgroundColor:
+                        allergy.severity === "Severe"
+                          ? isDark
+                            ? "rgba(239, 68, 68, 0.15)"
+                            : "#FEF2F2"
+                          : isDark
+                          ? "rgba(245, 158, 11, 0.15)"
+                          : "#FFFBEB",
+                      borderColor:
+                        allergy.severity === "Severe" ? "#F87171" : "#FCD34D",
+                    },
+                  ]}
                 >
-                  <Text
-                    className={`text-sm font-semibold ${allergyTextStyle[allergy.severity]}`}
-                  >
-                    {allergy.allergen}
-                    {" "}
-                    <Text className="font-normal opacity-70">·</Text>
-                    {" "}
-                    {allergy.severity}
-                    {allergy.severity === "Severe" && " ⚠"}
-                  </Text>
+                  <View style={styles.allergyTitleRow}>
+                    <Text
+                      style={[
+                        styles.allergyName,
+                        {
+                          color:
+                            allergy.severity === "Severe"
+                              ? "#EF4444"
+                              : "#D97706",
+                        },
+                      ]}
+                    >
+                      {allergy.allergen}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.allergySeverity,
+                        {
+                          color:
+                            allergy.severity === "Severe"
+                              ? "#EF4444"
+                              : "#D97706",
+                        },
+                      ]}
+                    >
+                      {allergy.severity}
+                    </Text>
+                  </View>
                   {allergy.reaction ? (
                     <Text
-                      className={`mt-0.5 text-xs ${allergyTextStyle[allergy.severity]} opacity-70`}
+                      style={[
+                        styles.allergyReaction,
+                        {
+                          color:
+                            allergy.severity === "Severe"
+                              ? "#F87171"
+                              : "#B45309",
+                        },
+                      ]}
                     >
                       {allergy.reaction}
                     </Text>
@@ -550,35 +661,374 @@ export default function RecordsScreen() {
               ))}
             </View>
 
-            {/* ── Active Chronic Conditions ───────────────── */}
-            <Text className="mb-3 mt-8 text-lg font-bold text-slate-900">
-              Active Conditions
+            {/* Active Regimen / Medications */}
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: colors.textPrimary, marginTop: 20 },
+              ]}
+            >
+              Active Medications
             </Text>
-            <View className="gap-2">
-              {[
-                { condition: "Hypertension", status: "Stage 1 — Managed", color: "bg-red-50 border-red-200", dot: "bg-red-500" },
-                { condition: "Reactive Airway", status: "Mild — PRN Inhaler", color: "bg-sky-50 border-sky-200", dot: "bg-sky-500" },
-              ].map((item) => (
+            <View style={styles.medicationsList}>
+              {patient.activeMedications.map((med) => (
                 <View
-                  key={item.condition}
-                  className={`flex-row items-center rounded-2xl border px-4 py-3 ${item.color}`}
+                  key={med.name}
+                  style={[
+                    styles.medicationRow,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
+                  ]}
                 >
-                  <View className={`mr-3 h-2.5 w-2.5 rounded-full ${item.dot}`} />
-                  <View>
-                    <Text className="text-sm font-bold text-slate-900">
-                      {item.condition}
-                    </Text>
-                    <Text className="text-xs text-slate-500">{item.status}</Text>
+                  <View style={styles.medIconPill}>
+                    <Activity size={18} color={colors.tabBarActive} />
                   </View>
+                  <View style={styles.medMeta}>
+                    <Text
+                      style={[
+                        styles.medName,
+                        { color: colors.textPrimary },
+                      ]}
+                    >
+                      {med.name} {med.dosage}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.medFreq,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      {med.frequency} • {med.timeOfDay}
+                    </Text>
+                  </View>
+                  <ShieldCheck size={18} color="#10B981" />
                 </View>
               ))}
             </View>
-          </>
+          </View>
         )}
       </ScrollView>
 
-      {/* ── Allergy Bottom Sheet Modal ─────────────────────── */}
+      {/* ── Unmountable Allergy Modal ───────────────────────────────── */}
       <AllergyModal ref={allergyModalRef} onSave={handleAddAllergy} />
-    </>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  rootContainer: {
+    flex: 1,
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingHorizontal: 18,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 16,
+  },
+  titleText: {
+    fontSize: 28,
+    fontWeight: "700",
+    letterSpacing: -0.5,
+  },
+  subtitleText: {
+    fontSize: 13,
+    fontWeight: "500",
+    marginTop: 2,
+  },
+  syncBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 9999,
+    borderWidth: 1,
+  },
+  syncDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#10B981",
+  },
+  syncBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#10B981",
+  },
+  segmentContainer: {
+    flexDirection: "row",
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 3,
+    marginBottom: 16,
+  },
+  segmentBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  segmentBtnActive: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  segmentText: {
+    fontSize: 13,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+  },
+  offlineBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 16,
+  },
+  offlineText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  monthSection: {
+    marginBottom: 20,
+    gap: 10,
+  },
+  monthTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  encounterCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+    gap: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  cardHeaderRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  cardDoctorMeta: {
+    flex: 1,
+    marginRight: 10,
+  },
+  doctorName: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  facilityName: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  cardSpecialtyCol: {
+    alignItems: "flex-end",
+    gap: 4,
+  },
+  dateText: {
+    fontSize: 11,
+  },
+  specialtyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 9999,
+    borderWidth: 1,
+  },
+  specialtyText: {
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  tagRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  tagBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  tagText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  summaryText: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  viewRecordRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 2,
+    marginTop: 4,
+  },
+  viewRecordText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  profileTabWrapper: {
+    gap: 14,
+  },
+  profileHeaderCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 16,
+  },
+  profileAvatarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  avatarCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitials: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  patientFullName: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  patientMeta: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  vitalsRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  vitalsCard: {
+    flex: 1,
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 14,
+    gap: 6,
+  },
+  vitalsLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    marginTop: 4,
+  },
+  vitalsValue: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  addAllergyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 9999,
+    borderWidth: 1,
+  },
+  addAllergyText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  allergiesGrid: {
+    gap: 8,
+  },
+  allergyCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    gap: 4,
+  },
+  allergyTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  allergyName: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  allergySeverity: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  allergyReaction: {
+    fontSize: 11,
+  },
+  medicationsList: {
+    gap: 8,
+  },
+  medicationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 12,
+    gap: 12,
+  },
+  medIconPill: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "rgba(56, 189, 248, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  medMeta: {
+    flex: 1,
+  },
+  medName: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  medFreq: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+});

@@ -34,11 +34,18 @@ config.cacheStores = [
   new FileStore({ root: path.join(projectRoot, ".metro-cache") }),
 ];
 
+// ─── Server config: rewrite /apps/mobile requests for monorepo clients ────────
+config.server = {
+  rewriteRequestUrl: (url) => {
+    if (url.startsWith("/apps/mobile/")) {
+      return url.replace(/^\/apps\/mobile/, "");
+    }
+    return url;
+  },
+};
+
 module.exports = withNativeWind(config, {
   input: path.resolve(projectRoot, "global.css"),
   projectRoot: projectRoot,
   configPath: path.resolve(projectRoot, "tailwind.config.js"),
 });
-
-
-

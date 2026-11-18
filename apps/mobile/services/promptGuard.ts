@@ -9,21 +9,20 @@ export interface PatientHealthProfile {
 }
 
 export const DEFAULT_PATIENT_PROFILE: PatientHealthProfile = {
-  name: "Zainab Bibi",
-  age: 38,
-  gender: "Female",
-  bloodGroup: "B+",
+  name: "Muhammad Ahsan",
+  age: 22,
+  gender: "Male",
+  bloodGroup: "O+",
   allergies: [
     "Penicillin (Severe anaphylaxis)",
-    "NSAIDs (Mild cutaneous reaction)",
+    "Sulfa Drugs (Moderate cutaneous reaction)",
   ],
   chronicConditions: [
     "Stage 1 Essential Hypertension (ICD-10: I10)",
-    "Mild Bronchial Asthma",
+    "Reactive Airway Component (Mild)",
   ],
   activeMedications: [
-    "Amlodipine 5mg PO OD",
-    "Lisinopril 10mg PO OD",
+    "Atenolol 50mg PO OD (Morning)",
     "Salbutamol MDI 100mcg 2 puffs PRN",
   ],
 };

@@ -87,24 +87,24 @@ export const MOCK_RECORDS: ClinicalEncounter[] = [
       { label: "Document attached", color: "emerald" },
     ],
     summary:
-      "Acute chest congestion and productive cough. Bacterial chest infection confirmed. Amoxicillin course and salbutamol rescue inhaler prescribed.",
+      "Acute chest congestion and reactive airway symptoms. Penicillin allergy observed. Azithromycin course and salbutamol rescue inhaler prescribed.",
     soap: {
       subjective:
-        "5-day history of productive cough with yellowish sputum, low-grade fever (37.9°C), and chest tightness on deep inspiration. Reports increased breathlessness on climbing stairs.",
+        "5-day history of productive cough with yellowish sputum, low-grade fever (37.9°C), and chest tightness on deep inspiration. Reports increased breathlessness on climbing stairs. Documented severe allergy to Penicillin.",
       objective:
-        "Temp: 37.9°C · RR: 19 breaths/min · SpO₂: 95% · BP: 118/76 mmHg · Chest auscultation: coarse crackles in right lower lobe. No wheeze at rest.",
+        "Temp: 37.9°C · RR: 19 breaths/min · SpO₂: 95% · BP: 118/76 mmHg · Chest auscultation: coarse crackles in right lower lobe. Mild expiratory wheeze.",
       assessment:
-        "Community-acquired bacterial pneumonia (right lower lobe) — ICD-10: J18.9. Mild reactive airway component noted.",
+        "Community-acquired bacterial chest infection — ICD-10: J18.9. Reactive airway disease. Severe Penicillin allergy noted.",
       plan:
-        "Amoxicillin 500mg three times daily for 7 days. Salbutamol inhaler (100mcg/puff) — 2 puffs as needed for breathlessness. Increase oral fluid intake. Rest for 5 days. Follow-up if fever persists beyond 72 hours or SpO₂ drops below 93%.",
+        "Azithromycin 500mg once daily for 5 days (Penicillin-safe macrolide). Salbutamol inhaler (100mcg/puff) — 2 puffs as needed for breathlessness. Increase oral fluid intake. Rest for 5 days.",
     },
     medications: [
       {
-        name: "Amoxicillin",
-        form: "Capsule",
+        name: "Azithromycin",
+        form: "Tablet",
         strength: "500 mg",
-        frequency: "Three times daily (with meals)",
-        duration: "7 days",
+        frequency: "Once daily (before meals)",
+        duration: "5 days",
       },
       {
         name: "Salbutamol",
@@ -159,7 +159,7 @@ export const MOCK_RECORDS: ClinicalEncounter[] = [
       "Contact dermatitis on inner left forearm. Desonide 0.05% topical cream prescribed for a 2-week course. Potential triggers identified.",
     soap: {
       subjective:
-        "3-week history of pruritic erythematous rash on the inner left forearm. Patient recently changed laundry detergent brand. No new food introductions. Denies systemic symptoms. Known allergy: NSAIDs (mild skin rash).",
+        "3-week history of pruritic erythematous rash on the inner left forearm. Patient recently changed laundry detergent brand. No new food introductions. Denies systemic symptoms. Known allergy: Sulfa Drugs (moderate skin rash).",
       objective:
         "Well-demarcated erythematous patch ~6×4 cm on left volar forearm. No vesiculation or oozing. Mild lichenification at margins. No regional lymphadenopathy.",
       assessment:

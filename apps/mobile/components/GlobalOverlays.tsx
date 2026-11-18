@@ -15,8 +15,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { Alert, Text, TouchableOpacity, View } from "react-native";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "../context/ThemeContext";
 
 type IntakeActions = { openIntakeActionSheet: () => void };
 const IntakeActionsContext = createContext<IntakeActions | null>(null);
@@ -31,6 +32,7 @@ export function useIntakeActions() {
 export function GlobalOverlays({ children }: PropsWithChildren) {
   const intakeSheetRef = useRef<BottomSheetModal>(null);
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const [consentVisible, setConsentVisible] = useState(false);
 
   useEffect(() => {
@@ -54,27 +56,30 @@ export function GlobalOverlays({ children }: PropsWithChildren) {
       {/* ── Doctor Access Request Toast ──────────────────── */}
       {consentVisible && (
         <View
-          className="absolute left-4 right-4 z-50 rounded-2xl bg-red-600 p-4 shadow-lg"
-          style={{ top: insets.top + 12 }}
+          style={[
+            styles.toastContainer,
+            { top: insets.top + 12 },
+          ]}
         >
-          <View className="flex-row items-start">
+          <View style={styles.toastRow}>
             <AlertTriangle color="#FFFFFF" size={22} strokeWidth={2.5} />
-            <View className="ml-3 flex-1">
-              <Text className="text-xs font-bold tracking-wide text-white">
+            <View style={styles.toastContent}>
+              <Text style={styles.toastBadge}>
                 DOCTOR ACCESS REQUEST
               </Text>
-              <Text className="mt-1 text-base font-bold text-white">
+              <Text style={styles.toastTitle}>
                 Dr. Ayesha Malik wants to view your records
               </Text>
-              <Text className="mt-1 text-sm leading-5 text-red-100">
+              <Text style={styles.toastSub}>
                 Cardiology at PIMS Hospital · Full history · 24 hours
               </Text>
-              <View className="mt-4 flex-row gap-2">
+              <View style={styles.toastActionRow}>
                 <TouchableOpacity
                   onPress={() => setConsentVisible(false)}
-                  className="flex-1 rounded-xl bg-white/15 px-3 py-3"
+                  style={styles.toastRejectBtn}
+                  activeOpacity={0.7}
                 >
-                  <Text className="text-center text-sm font-semibold text-white">
+                  <Text style={styles.toastRejectText}>
                     Reject
                   </Text>
                 </TouchableOpacity>
@@ -86,9 +91,10 @@ export function GlobalOverlays({ children }: PropsWithChildren) {
                       "Dr. Ayesha Malik can view your records for 24 hours."
                     );
                   }}
-                  className="flex-1 rounded-xl bg-white px-3 py-3"
+                  style={styles.toastApproveBtn}
+                  activeOpacity={0.7}
                 >
-                  <Text className="text-center text-sm font-bold text-red-600">
+                  <Text style={styles.toastApproveText}>
                     Approve
                   </Text>
                 </TouchableOpacity>
@@ -97,7 +103,7 @@ export function GlobalOverlays({ children }: PropsWithChildren) {
             <TouchableOpacity
               accessibilityLabel="Dismiss doctor access request"
               onPress={() => setConsentVisible(false)}
-              className="ml-2 h-11 w-11 items-center justify-center"
+              style={styles.toastCloseBtn}
             >
               <X color="#FFFFFF" size={19} />
             </TouchableOpacity>
@@ -110,36 +116,56 @@ export function GlobalOverlays({ children }: PropsWithChildren) {
         ref={intakeSheetRef}
         snapPoints={["48%"]}
         enablePanDownToClose
-        backgroundStyle={{ backgroundColor: "#FFFFFF", borderRadius: 24 }}
-        handleIndicatorStyle={{ backgroundColor: "#CBD5E1", width: 48 }}
+        backgroundStyle={{
+          backgroundColor: colors.surface,
+          borderRadius: 24,
+          borderWidth: 1,
+          borderColor: colors.border,
+        }}
+        handleIndicatorStyle={{
+          backgroundColor: isDark ? "rgba(255,255,255,0.25)" : "#CBD5E1",
+          width: 48,
+        }}
       >
         <BottomSheetView
-          style={{ paddingBottom: Math.max(insets.bottom, 16) }}
-          className="px-5 pt-2"
+          style={[
+            styles.sheetContent,
+            { paddingBottom: Math.max(insets.bottom, 16) },
+          ]}
         >
           {/* Header */}
-          <Text className="text-xl font-bold text-slate-900">
+          <Text
+            style={[
+              styles.sheetTitle,
+              { color: colors.textPrimary },
+            ]}
+          >
             New Clinical Encounter
           </Text>
-          <Text className="mt-1 text-sm text-slate-500">
-            Log today's doctor consultation and link medical documents.
+          <Text
+            style={[
+              styles.sheetSub,
+              { color: colors.textSecondary },
+            ]}
+          >
+            Log doctor consultation and link medical documents.
           </Text>
 
-          {/* Primary Action — Log Doctor Consultation (80% visual emphasis) */}
+          {/* Primary Action — Log Doctor Consultation */}
           <TouchableOpacity
             onPress={() => chooseIntake("/intake/doctor-session")}
-            className="mt-5 w-full flex-row items-center justify-between rounded-2xl bg-sky-600 p-4 shadow-sm"
+            style={styles.primaryActionBtn}
             activeOpacity={0.8}
           >
-            <View className="flex-1 flex-row items-center pr-4">
-              <View className="mr-4 h-12 w-12 items-center justify-center rounded-xl bg-white/20">
+            <View style={styles.actionLeft}>
+              <View style={styles.primaryIconBox}>
                 <Stethoscope size={24} color="#FFFFFF" />
               </View>
-              <View>
-                <Text className="text-base font-bold text-white">
+              <View style={styles.actionMeta}>
+                <Text style={styles.primaryActionTitle}>
                   Log Doctor Consultation
                 </Text>
-                <Text className="text-sm text-white/80">
+                <Text style={styles.primaryActionSub}>
                   Record discussion, advice & attach prescription
                 </Text>
               </View>
@@ -150,26 +176,215 @@ export function GlobalOverlays({ children }: PropsWithChildren) {
           {/* Secondary Action — Quick Scan Only */}
           <TouchableOpacity
             onPress={() => chooseIntake("/intake/scan-document")}
-            className="mt-3 w-full flex-row items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4"
+            style={[
+              styles.secondaryActionBtn,
+              {
+                backgroundColor: colors.surfaceElevated,
+                borderColor: colors.border,
+              },
+            ]}
             activeOpacity={0.7}
           >
-            <View className="flex-1 flex-row items-center pr-4">
-              <View className="mr-4 h-12 w-12 items-center justify-center rounded-xl bg-slate-200">
-                <ScanLine size={24} color="#475569" />
+            <View style={styles.actionLeft}>
+              <View
+                style={[
+                  styles.secondaryIconBox,
+                  {
+                    backgroundColor: isDark
+                      ? "rgba(255,255,255,0.08)"
+                      : "#E2E8F0",
+                  },
+                ]}
+              >
+                <ScanLine
+                  size={24}
+                  color={isDark ? "#38BDF8" : "#475569"}
+                />
               </View>
-              <View>
-                <Text className="text-base font-semibold text-slate-800">
+              <View style={styles.actionMeta}>
+                <Text
+                  style={[
+                    styles.secondaryActionTitle,
+                    { color: colors.textPrimary },
+                  ]}
+                >
                   Quick Scan Document Only
                 </Text>
-                <Text className="text-sm text-slate-500">
+                <Text
+                  style={[
+                    styles.secondaryActionSub,
+                    { color: colors.textSecondary },
+                  ]}
+                >
                   Digitize lab report or past prescription image
                 </Text>
               </View>
             </View>
-            <ChevronRight size={20} color="#94A3B8" />
+            <ChevronRight size={20} color={colors.textSecondary} />
           </TouchableOpacity>
         </BottomSheetView>
       </BottomSheetModal>
     </IntakeActionsContext.Provider>
   );
 }
+
+const styles = StyleSheet.create({
+  toastContainer: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    zIndex: 50,
+    borderRadius: 20,
+    backgroundColor: "#DC2626",
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  toastRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  toastContent: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  toastBadge: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+    color: "#FFFFFF",
+  },
+  toastTitle: {
+    marginTop: 4,
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  toastSub: {
+    marginTop: 4,
+    fontSize: 13,
+    lineHeight: 18,
+    color: "rgba(255,255,255,0.85)",
+  },
+  toastActionRow: {
+    marginTop: 14,
+    flexDirection: "row",
+    gap: 8,
+  },
+  toastRejectBtn: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  toastRejectText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  toastApproveBtn: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+  toastApproveText: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#DC2626",
+  },
+  toastCloseBtn: {
+    marginLeft: 8,
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sheetContent: {
+    paddingHorizontal: 20,
+    paddingTop: 6,
+  },
+  sheetTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+  },
+  sheetSub: {
+    marginTop: 4,
+    fontSize: 13,
+  },
+  primaryActionBtn: {
+    marginTop: 18,
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 18,
+    backgroundColor: "#0284C7",
+    padding: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  actionLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingRight: 12,
+  },
+  primaryIconBox: {
+    marginRight: 14,
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  actionMeta: {
+    flex: 1,
+  },
+  primaryActionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  primaryActionSub: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.85)",
+    marginTop: 2,
+  },
+  secondaryActionBtn: {
+    marginTop: 12,
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 16,
+  },
+  secondaryIconBox: {
+    marginRight: 14,
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 14,
+  },
+  secondaryActionTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  secondaryActionSub: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+});

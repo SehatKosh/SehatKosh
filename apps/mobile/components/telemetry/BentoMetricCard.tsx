@@ -1,5 +1,10 @@
-import React from "react";
-import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useMemo } from "react";
+import {
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { ChevronRight } from "lucide-react-native";
 import { useTheme } from "../../context/ThemeContext";
 
@@ -23,9 +28,6 @@ const DEFAULT_16_BARS = [
   20, 15, 12, 10, 15, 35, 60, 75, 85, 70, 80, 90, 75, 60, 40, 25,
 ];
 
-const SCREEN_WIDTH = Dimensions.get("window").width;
-const DEFAULT_CARD_WIDTH = Math.floor((SCREEN_WIDTH - 16 * 2 - 12) / 2);
-
 export function BentoMetricCard({
   id,
   label,
@@ -37,14 +39,13 @@ export function BentoMetricCard({
   accentColor = "#FA114F",
   bars,
   ticks,
-  cardWidth = DEFAULT_CARD_WIDTH,
   onPress,
 }: BentoMetricCardProps) {
   const { colors, isDark } = useTheme();
 
   // Normalize bars to exactly 16 slots (accepting bars or ticks alias)
   const sourceBars = bars ?? ticks ?? DEFAULT_16_BARS;
-  const displayBars = React.useMemo(() => {
+  const displayBars = useMemo(() => {
     if (!sourceBars || sourceBars.length === 0) return DEFAULT_16_BARS;
     if (sourceBars.length === 16) return sourceBars;
     return Array.from({ length: 16 }, (_, i) => {
@@ -54,22 +55,29 @@ export function BentoMetricCard({
   }, [sourceBars]);
 
   // Convert hex accent color to 14% translucent track color
-  const trackBgColor = React.useMemo(() => {
+  const trackBgColor = useMemo(() => {
     return isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)";
   }, [isDark]);
 
+  const cardBorderColor = isDark
+    ? "rgba(255, 255, 255, 0.12)"
+    : "#CBD5E1";
+
+  const chevronBg = isDark
+    ? "rgba(255, 255, 255, 0.08)"
+    : "#F1F5F9";
+
   return (
-    <Pressable
+    <TouchableOpacity
+      activeOpacity={0.75}
       accessibilityRole="button"
       accessibilityLabel={`${label}: ${value} ${unit || ""}`}
       onPress={() => onPress(id)}
-      style={({ pressed }) => [
+      style={[
         styles.cardContainer,
         {
-          width: cardWidth,
           backgroundColor: colors.surface,
-          borderColor: isDark ? "rgba(255, 255, 255, 0.10)" : "#E2E8F0",
-          transform: [{ scale: pressed ? 0.96 : 1 }],
+          borderColor: cardBorderColor,
         },
       ]}
     >
@@ -85,13 +93,12 @@ export function BentoMetricCard({
         >
           {label}
         </Text>
-        <View
-          style={[
-            styles.chevronCircle,
-            { backgroundColor: colors.surfaceElevated },
-          ]}
-        >
-          <ChevronRight size={12} color={colors.textSecondary} />
+        <View style={[styles.chevronCircle, { backgroundColor: chevronBg }]}>
+          <ChevronRight
+            size={12}
+            color={colors.textSecondary}
+            strokeWidth={2.4}
+          />
         </View>
       </View>
 
@@ -120,7 +127,7 @@ export function BentoMetricCard({
           <Text
             style={[
               styles.unitText,
-              { color: unitColor || valueColor || colors.textSecondary },
+              { color: unitColor || valueColor || accentColor },
             ]}
           >
             {unit}
@@ -128,7 +135,7 @@ export function BentoMetricCard({
         ) : null}
       </View>
 
-      {/* ── Row 4: 16 Narrow Vertical Bars (width: 3, height: 36) ────────── */}
+      {/* ── Row 4: 16 Narrow Vertical Bars (width: 3.5, height: 38) ──────── */}
       <View style={styles.barsContainer}>
         <View style={styles.barsRow}>
           {displayBars.map((heightPercent, index) => {
@@ -155,34 +162,36 @@ export function BentoMetricCard({
           })}
         </View>
 
-        {/* ONLY 3 Spaced Time Indicators: 12AM, 12PM, 6PM */}
+        {/* ONLY 3 Spaced Time Indicators: 12 AM, 12 PM, 6 PM */}
         <View style={styles.timeIndicatorsRow}>
           <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>
-            12AM
+            12 AM
           </Text>
           <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>
-            12PM
+            12 PM
           </Text>
           <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>
-            6PM
+            6 PM
           </Text>
         </View>
       </View>
-    </Pressable>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   cardContainer: {
+    width: "100%",
     borderRadius: 22,
-    borderWidth: 1,
+    borderWidth: 1.5,
     padding: 16,
     justifyContent: "space-between",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+    overflow: "hidden",
   },
   headerRow: {
     flexDirection: "row",
@@ -190,21 +199,21 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   titleText: {
-    fontSize: 14,
+    fontSize: 14.5,
     fontWeight: "600",
     letterSpacing: -0.2,
     flex: 1,
-    marginRight: 4,
+    marginRight: 6,
   },
   chevronCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
   timestampText: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: "500",
     marginTop: 2,
   },
@@ -226,32 +235,35 @@ const styles = StyleSheet.create({
   },
   barsContainer: {
     marginTop: 2,
+    width: "100%",
   },
   barsRow: {
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    height: 36,
+    height: 38,
+    width: "100%",
   },
   barTrack: {
-    width: 3,
-    height: 36,
+    width: 3.5,
+    height: 38,
     borderRadius: 2,
     justifyContent: "flex-end",
     overflow: "hidden",
   },
   barFill: {
-    width: 3,
+    width: 3.5,
     borderRadius: 2,
   },
   timeIndicatorsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    width: "100%",
     marginTop: 6,
   },
   timeLabel: {
     fontSize: 10,
-    fontWeight: "500",
-    letterSpacing: -0.2,
+    fontWeight: "600",
+    letterSpacing: 0.1,
   },
 });

@@ -34,3 +34,5 @@ config.bat
 
 .env
 apps/mobile/.env
+*.apk
+build/

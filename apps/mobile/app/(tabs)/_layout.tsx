@@ -19,6 +19,7 @@ export default function TabLayout() {
       backBehavior="history"
       screenOptions={{
         headerShown: false,
+        tabBarHideOnKeyboard: true,
         tabBarActiveTintColor: isDark ? "#38BDF8" : "#0284C7",
         tabBarInactiveTintColor: theme.textSecondary,
         tabBarLabelStyle: { fontSize: 10, fontWeight: "600" },

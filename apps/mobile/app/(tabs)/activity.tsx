@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,6 +18,13 @@ import {
   MetricDetailData,
   MetricDetailSheet,
 } from "../../components/telemetry/MetricDetailSheet";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const HORIZONTAL_PADDING = 16;
+const CARD_GAP = 12;
+const CARD_WIDTH = Math.floor(
+  (SCREEN_WIDTH - HORIZONTAL_PADDING * 2 - CARD_GAP) / 2
+);
 
 export default function ActivityScreen() {
   const insets = useSafeAreaInsets();
@@ -231,6 +239,7 @@ export default function ActivityScreen() {
               unit="BPM"
               accentColor="#FA114F"
               valueColor="#FA114F"
+              cardWidth={CARD_WIDTH}
               ticks={[18, 15, 12, 10, 10, 15, 30, 50, 72, 68, 75, 72, 80, 76, 74, 82, 78, 65, 55, 48, 40, 32, 25, 20]}
               onPress={handleCardPress}
             />
@@ -242,6 +251,7 @@ export default function ActivityScreen() {
               unit="%"
               accentColor="#38BDF8"
               valueColor="#38BDF8"
+              cardWidth={CARD_WIDTH}
               ticks={[88, 90, 89, 90, 92, 95, 98, 98, 97, 98, 98, 99, 98, 98, 98, 99, 98, 98, 97, 98, 98, 97, 98, 98]}
               onPress={handleCardPress}
             />
@@ -257,6 +267,7 @@ export default function ActivityScreen() {
               unit="mmHg"
               accentColor="#F59E0B"
               valueColor="#F59E0B"
+              cardWidth={CARD_WIDTH}
               ticks={[30, 28, 25, 22, 20, 24, 45, 65, 75, 70, 78, 72, 80, 76, 72, 75, 70, 62, 55, 48, 42, 36, 32, 28]}
               onPress={handleCardPress}
             />
@@ -267,6 +278,7 @@ export default function ActivityScreen() {
               value={telemetry.sleepDuration}
               accentColor="#818CF8"
               valueColor="#818CF8"
+              cardWidth={CARD_WIDTH}
               ticks={[95, 95, 90, 85, 92, 88, 70, 30, 10, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 60]}
               onPress={handleCardPress}
             />
@@ -282,6 +294,7 @@ export default function ActivityScreen() {
               unit="KM"
               accentColor="#0284C7"
               valueColor="#0284C7"
+              cardWidth={CARD_WIDTH}
               ticks={[0, 0, 0, 0, 0, 5, 20, 45, 60, 55, 75, 80, 85, 70, 65, 90, 85, 60, 45, 30, 20, 10, 5, 0]}
               onPress={handleCardPress}
             />
@@ -293,6 +306,7 @@ export default function ActivityScreen() {
               unit="mg/dL"
               accentColor="#10B981"
               valueColor="#10B981"
+              cardWidth={CARD_WIDTH}
               ticks={[40, 38, 35, 32, 30, 35, 55, 75, 65, 58, 70, 85, 72, 60, 55, 68, 78, 70, 60, 52, 48, 44, 42, 40]}
               onPress={handleCardPress}
             />
@@ -317,7 +331,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingHorizontal: 18,
+    paddingHorizontal: HORIZONTAL_PADDING,
   },
   headerRow: {
     flexDirection: "row",

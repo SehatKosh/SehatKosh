@@ -71,8 +71,12 @@ export default function ChatScreen() {
     }
   }, [initialQuery]);
 
-  // ── Keyboard Visibility Tracking ──────────────────────────────────────────
+  // ── Keyboard Visibility & Height Tracking ─────────────────────────────────
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const [didWindowResize, setDidWindowResize] = useState(false);
+  const baseHeightRef = useRef<number>(0);
+  const currentHeightRef = useRef<number>(0);
 
   useEffect(() => {
     const showEvent =
@@ -80,12 +84,20 @@ export default function ChatScreen() {
     const hideEvent =
       Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
 
-    const showSub = Keyboard.addListener(showEvent, () => {
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      const kh = e?.endCoordinates?.height || 280;
+      setKeyboardHeight(kh);
       setKeyboardVisible(true);
+      if (baseHeightRef.current && currentHeightRef.current) {
+        const shrank = currentHeightRef.current < baseHeightRef.current - 100;
+        setDidWindowResize(shrank);
+      }
     });
 
     const hideSub = Keyboard.addListener(hideEvent, () => {
       setKeyboardVisible(false);
+      setKeyboardHeight(0);
+      setDidWindowResize(false);
     });
 
     return () => {
@@ -419,6 +431,17 @@ export default function ChatScreen() {
   const bottomPadding = Math.max(insets.bottom, 12);
   const isZeroState = messages.length === 0 && !isStreaming;
 
+  const effectiveKeyboardHeight = keyboardHeight > 0 ? keyboardHeight : 280;
+  const dockBottomPadding = Platform.select({
+    ios: bottomPadding,
+    android: keyboardVisible
+      ? didWindowResize
+        ? 10
+        : effectiveKeyboardHeight + 10
+      : bottomPadding,
+    default: bottomPadding,
+  });
+
   return (
     <View
       style={[
@@ -428,6 +451,20 @@ export default function ChatScreen() {
           paddingTop: topPadding,
         },
       ]}
+      onLayout={(e) => {
+        const h = e.nativeEvent.layout.height;
+        if (
+          !baseHeightRef.current ||
+          (!keyboardVisible && h > baseHeightRef.current)
+        ) {
+          baseHeightRef.current = h;
+        }
+        currentHeightRef.current = h;
+        if (keyboardVisible) {
+          const shrank = h < baseHeightRef.current - 100;
+          setDidWindowResize(shrank);
+        }
+      }}
     >
       {/* ── 1. Clean 2-Element Header: Left Menu, Center Status, Right EMPTY ── */}
       <AviHeaderControls
@@ -487,16 +524,7 @@ export default function ChatScreen() {
         )}
 
         {/* ── 3. Bottom Taller Capsule Dock with Android Keyboard Avoidance ─── */}
-        <View
-          style={{
-            paddingBottom:
-              Platform.OS === "android"
-                ? keyboardVisible
-                  ? 10
-                  : bottomPadding
-                : bottomPadding,
-          }}
-        >
+        <View style={{ paddingBottom: dockBottomPadding }}>
           <AviBottomDock
             input={input}
             onInputChange={handleTextChange}

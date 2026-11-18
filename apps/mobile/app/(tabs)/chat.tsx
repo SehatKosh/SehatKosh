@@ -28,7 +28,8 @@ import {
   buildGroundedPrompt,
   validatePrompt,
 } from "../../services/promptGuard";
-import { useAppTheme } from "../../constants/themeContext";
+import { useTheme } from "../../context/ThemeContext";
+import { usePatient } from "../../context/PatientContext";
 import {
   ChatMessage,
   ChatMessageBubble,
@@ -42,7 +43,9 @@ const AnimatedView = Animated.View as any;
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
-  const { theme, isDark } = useAppTheme();
+  const { colors, isDark } = useTheme();
+  const { patient, telemetry } = usePatient();
+
   const listRef = useRef<FlatList>(null);
   const textInputRef = useRef<any>(null);
 
@@ -57,9 +60,35 @@ export default function ChatScreen() {
   const [input, setInput] = useState("");
   const inputRef = useRef("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [includeHealthProfile, setIncludeHealthProfile] = useState(true);
   const [selectedImage, setSelectedImage] = useState<PreparedImage | null>(null);
-  const [mode, setMode] = useState<"chat" | "scan">("chat");
+
+  // ── Android Keyboard Height Tracking (Solves Android keyboard overlap) ─────
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      if (Platform.OS === "android") {
+        // Offset by keyboard height minus bottom tab bar height (~78px)
+        setKeyboardOffset(Math.max(e.endCoordinates.height - 78, 12));
+      }
+    });
+
+    const hideSub = Keyboard.addListener(hideEvent, () => {
+      if (Platform.OS === "android") {
+        setKeyboardOffset(0);
+      }
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // ── Streaming State ───────────────────────────────────────────────────────
   const [isStreaming, setIsStreaming] = useState(false);
@@ -69,7 +98,6 @@ export default function ChatScreen() {
   const [requestStartTime, setRequestStartTime] = useState<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Store last failed query for retry
   const lastFailedQueryRef = useRef<{
     prompt: string;
     image: PreparedImage | null;
@@ -235,21 +263,26 @@ export default function ChatScreen() {
         imageName: currentImage?.name,
       };
 
-      // Clear input fields
       inputRef.current = "";
       setInput("");
       setSelectedImage(null);
-
-      // Dismiss soft keyboard
       Keyboard.dismiss();
 
-      // Add user message to inverted list
       setMessages((prev) => [userMessage, ...prev]);
 
-      // Prepare clinical prompt
-      const fullPrompt = buildGroundedPrompt(userText, includeHealthProfile);
+      // Ground prompt in synchronized patient profile
+      const fullPrompt = buildGroundedPrompt(userText, true, {
+        name: patient.fullName,
+        age: patient.age,
+        gender: patient.gender,
+        bloodGroup: patient.bloodGroup,
+        allergies: patient.allergies,
+        chronicConditions: patient.chronicConditions,
+        activeMedications: patient.activeMedications.map(
+          (m) => `${m.name} ${m.dosage} (${m.frequency})`
+        ),
+      });
 
-      // Setup streaming state
       setIsStreaming(true);
       const startTime = Date.now();
       setRequestStartTime(startTime);
@@ -281,7 +314,7 @@ export default function ChatScreen() {
                   minute: "2-digit",
                 }),
                 isStreaming: true,
-                isGrounded: includeHealthProfile,
+                isGrounded: true,
                 latencyMs: Date.now() - startTime,
               };
 
@@ -298,7 +331,6 @@ export default function ChatScreen() {
           },
         });
 
-        // Finalize completed streaming message
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMsgId
@@ -336,10 +368,9 @@ export default function ChatScreen() {
         abortControllerRef.current = null;
       }
     },
-    [input, selectedImage, health.status, includeHealthProfile, refreshHealth]
+    [input, selectedImage, health.status, patient, refreshHealth]
   );
 
-  // ── Retry Failed Query ────────────────────────────────────────────────────
   const handleRetry = useCallback(
     (failedMsg: ChatMessage) => {
       if (lastFailedQueryRef.current) {
@@ -352,13 +383,27 @@ export default function ChatScreen() {
     [handleSend, refreshHealth]
   );
 
-  // ── Reset / New Chat Conversation ─────────────────────────────────────────
   const handleNewChat = () => {
     handleStopGeneration();
     setMessages([]);
     setSelectedImage(null);
     inputRef.current = "";
     setInput("");
+  };
+
+  const handleClearHistory = () => {
+    Alert.alert(
+      "Clear Conversation",
+      "Reset dialogue and remove all chat history?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear",
+          style: "destructive",
+          onPress: handleNewChat,
+        },
+      ]
+    );
   };
 
   const handleTextChange = (text: string) => {
@@ -368,7 +413,6 @@ export default function ChatScreen() {
 
   const topPadding = Math.max(insets.top, 14);
   const bottomPadding = Math.max(insets.bottom, 12);
-
   const isZeroState = messages.length === 0 && !isStreaming;
 
   return (
@@ -376,17 +420,18 @@ export default function ChatScreen() {
       style={[
         styles.rootContainer,
         {
-          backgroundColor: theme.canvas,
+          backgroundColor: colors.canvas,
           paddingTop: topPadding,
         },
       ]}
     >
-      {/* ── 1. Minimal Top Header (Drawer, Model Pill, New Chat / Avatar) ───── */}
+      {/* ── 1. Clean 2-Element Header: Left Menu, Center Status, Right EMPTY ── */}
       <AviHeaderControls
         health={health}
         onRefreshHealth={refreshHealth}
         isCheckingHealth={isCheckingHealth}
         onNewChat={handleNewChat}
+        onClearHistory={handleClearHistory}
       />
 
       {/* ── 2. Chat Feed & Floating Dock in KeyboardAvoidingView ──────────── */}
@@ -396,10 +441,10 @@ export default function ChatScreen() {
         keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
         {isZeroState ? (
-          /* Zero-State Hero Canvas (70%+ Negative Space, Breathing Glow) */
+          /* Custom SehatKosh Clinical Shield Hero Canvas (70%+ Negative Space) */
           <AnimatedView
-            entering={FadeIn.duration(260)}
-            exiting={FadeOutUp.duration(220)}
+            entering={FadeIn.duration(240)}
+            exiting={FadeOutUp.duration(200)}
             style={styles.zeroStateWrapper}
           >
             <AviHeroEmblem prompt="What should we focus on?" />
@@ -431,8 +476,15 @@ export default function ChatScreen() {
           />
         )}
 
-        {/* ── 3. Bottom Floating Capsule Dock + Mode Toggle ─────────────────── */}
-        <View style={{ paddingBottom: bottomPadding }}>
+        {/* ── 3. Bottom Taller Capsule Dock with Android Keyboard Avoidance ─── */}
+        <View
+          style={{
+            paddingBottom:
+              Platform.OS === "android" && keyboardOffset > 0
+                ? keyboardOffset
+                : bottomPadding,
+          }}
+        >
           <AviBottomDock
             input={input}
             onInputChange={handleTextChange}
@@ -443,12 +495,6 @@ export default function ChatScreen() {
             onClearImage={() => setSelectedImage(null)}
             onTakePhoto={takePhotoWithCamera}
             onPickGallery={pickImageFromGallery}
-            includeHealthProfile={includeHealthProfile}
-            onToggleHealthProfile={() =>
-              setIncludeHealthProfile((prev) => !prev)
-            }
-            mode={mode}
-            onModeChange={setMode}
             inputRef={textInputRef}
           />
         </View>

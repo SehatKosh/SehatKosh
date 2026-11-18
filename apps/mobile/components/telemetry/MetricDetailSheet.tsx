@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import {
   Dimensions,
+  Modal,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -8,9 +9,10 @@ import {
   View,
 } from "react-native";
 import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
-import { ChevronRight, X } from "lucide-react-native";
-import { useAppTheme } from "../../constants/themeContext";
-import { RADII } from "../../constants/theme";
+import { MessageSquare, Sparkles, X } from "lucide-react-native";
+import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useTheme } from "../../context/ThemeContext";
 
 export interface MetricDetailData {
   id: string;
@@ -19,7 +21,9 @@ export interface MetricDetailData {
   unit: string;
   status: string;
   statusColor: string;
-  sparklinePoints: number[]; // normalized or absolute
+  minRange?: string;
+  maxRange?: string;
+  sparklinePoints: number[];
   recentReadings: Array<{ time: string; value: string }>;
 }
 
@@ -31,12 +35,12 @@ interface MetricDetailSheetProps {
 const { width } = Dimensions.get("window");
 
 export function MetricDetailSheet({ data, onClose }: MetricDetailSheetProps) {
-  const { theme, isDark } = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const [range, setRange] = useState<"24H" | "7D" | "30D">("7D");
 
   if (!data) return null;
 
-  // Build SVG path from points
   const graphWidth = width - 64;
   const graphHeight = 100;
   const points = data.sparklinePoints;
@@ -54,225 +58,235 @@ export function MetricDetailSheet({ data, onClose }: MetricDetailSheetProps) {
   const linePath = pathCoordinates.join(" ");
   const areaPath = `${linePath} L ${graphWidth} ${graphHeight} L 0 ${graphHeight} Z`;
 
+  const handleAskAvi = () => {
+    onClose();
+    router.navigate("/(tabs)/chat");
+  };
+
   return (
-    <View style={StyleSheet.absoluteFill}>
-      {/* Backdrop */}
+    <Modal
+      visible={Boolean(data)}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
       <TouchableWithoutFeedback onPress={onClose}>
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: "rgba(0, 0, 0, 0.6)" },
-          ]}
-        />
-      </TouchableWithoutFeedback>
-
-      {/* Sheet Content */}
-      <View
-        style={[
-          styles.sheetContainer,
-          {
-            backgroundColor: theme.surfaceElevated,
-            borderColor: theme.borderActive,
-          },
-        ]}
-      >
-        {/* Handle bar */}
-        <View style={styles.handleBar} />
-
-        {/* Header */}
-        <View style={styles.sheetHeader}>
-          <View>
-            <Text
+        <View style={styles.backdrop}>
+          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+            <View
               style={[
-                styles.sheetLabel,
-                { color: theme.textSecondary },
+                styles.sheetContainer,
+                {
+                  backgroundColor: colors.surfaceElevated,
+                  borderColor: colors.borderStrong,
+                  paddingBottom: Math.max(insets.bottom, 24),
+                },
               ]}
             >
-              {data.label}
-            </Text>
-            <View style={styles.valueRow}>
-              <Text
-                style={[
-                  styles.sheetValue,
-                  { color: theme.textPrimary },
-                ]}
-              >
-                {data.currentValue}
-              </Text>
-              <Text
-                style={[
-                  styles.sheetUnit,
-                  { color: theme.textSecondary },
-                ]}
-              >
-                {data.unit}
-              </Text>
-              <View
-                style={[
-                  styles.statusBadge,
-                  { backgroundColor: `${data.statusColor}22` },
-                ]}
-              >
-                <Text
+              {/* Handle bar */}
+              <View style={styles.handleBar} />
+
+              {/* Header */}
+              <View style={styles.sheetHeader}>
+                <View>
+                  <Text
+                    style={[
+                      styles.sheetLabel,
+                      { color: colors.textSecondary },
+                    ]}
+                  >
+                    {data.label}
+                  </Text>
+                  <View style={styles.valueRow}>
+                    <Text
+                      style={[
+                        styles.sheetValue,
+                        { color: colors.textPrimary },
+                      ]}
+                    >
+                      {data.currentValue}
+                    </Text>
+                    {data.unit ? (
+                      <Text
+                        style={[
+                          styles.sheetUnit,
+                          { color: colors.textSecondary },
+                        ]}
+                      >
+                        {data.unit}
+                      </Text>
+                    ) : null}
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        { backgroundColor: `${data.statusColor}22` },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusBadgeText,
+                          { color: data.statusColor },
+                        ]}
+                      >
+                        {data.status}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  onPress={onClose}
+                  activeOpacity={0.7}
                   style={[
-                    styles.statusBadgeText,
-                    { color: data.statusColor },
+                    styles.closeBtn,
+                    { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
                   ]}
                 >
-                  {data.status}
-                </Text>
+                  <X size={16} color={colors.textSecondary} />
+                </TouchableOpacity>
               </View>
+
+              {/* Time Range Selector */}
+              <View
+                style={[
+                  styles.rangeSelector,
+                  {
+                    backgroundColor: isDark ? "#0D1117" : "#F1F5F9",
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                {(["24H", "7D", "30D"] as const).map((r) => (
+                  <TouchableOpacity
+                    key={r}
+                    onPress={() => setRange(r)}
+                    activeOpacity={0.8}
+                    style={[
+                      styles.rangePill,
+                      range === r && [
+                        styles.rangePillActive,
+                        {
+                          backgroundColor: isDark ? "#1C212C" : "#FFFFFF",
+                          borderColor: colors.border,
+                        },
+                      ],
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.rangeText,
+                        {
+                          color:
+                            range === r
+                              ? colors.textPrimary
+                              : colors.textSecondary,
+                          fontWeight: range === r ? "700" : "500",
+                        },
+                      ]}
+                    >
+                      {r}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* 7-Day Trend Sparkline Graph */}
+              <View style={styles.chartContainer}>
+                <Svg width={graphWidth} height={graphHeight}>
+                  <Defs>
+                    <LinearGradient id="sheetGrad" x1="0" y1="0" x2="0" y2="1">
+                      <Stop
+                        offset="0%"
+                        stopColor={data.statusColor}
+                        stopOpacity="0.35"
+                      />
+                      <Stop
+                        offset="100%"
+                        stopColor={data.statusColor}
+                        stopOpacity="0.0"
+                      />
+                    </LinearGradient>
+                  </Defs>
+                  <Path d={areaPath} fill="url(#sheetGrad)" />
+                  <Path
+                    d={linePath}
+                    fill="none"
+                    stroke={data.statusColor}
+                    strokeWidth={2.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </Svg>
+              </View>
+
+              {/* Min/Max Baseline Indicator */}
+              <View
+                style={[
+                  styles.rangeIndicatorRow,
+                  {
+                    backgroundColor: isDark ? "#0D1117" : "#F8FAFC",
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <View style={styles.rangeItem}>
+                  <Text style={[styles.rangeLabel, { color: colors.textSecondary }]}>
+                    Min Range
+                  </Text>
+                  <Text style={[styles.rangeVal, { color: colors.textPrimary }]}>
+                    {data.minRange || `${min} ${data.unit}`}
+                  </Text>
+                </View>
+                <View style={styles.rangeItem}>
+                  <Text style={[styles.rangeLabel, { color: colors.textSecondary }]}>
+                    Max Range
+                  </Text>
+                  <Text style={[styles.rangeVal, { color: colors.textPrimary }]}>
+                    {data.maxRange || `${max} ${data.unit}`}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Quick Action: "Ask Avi About This Metric" */}
+              <TouchableOpacity
+                onPress={handleAskAvi}
+                activeOpacity={0.8}
+                style={[
+                  styles.askAviBtn,
+                  { backgroundColor: colors.tabBarActive },
+                ]}
+              >
+                <MessageSquare size={16} color="#FFFFFF" />
+                <Text style={styles.askAviText}>
+                  Ask Avi About My {data.label}
+                </Text>
+              </TouchableOpacity>
             </View>
-          </View>
-
-          <TouchableOpacity
-            onPress={onClose}
-            activeOpacity={0.7}
-            style={[
-              styles.closeBtn,
-              { backgroundColor: isDark ? "#1C212C" : "#F1F5F9" },
-            ]}
-          >
-            <X size={16} color={theme.textSecondary} />
-          </TouchableOpacity>
+          </TouchableWithoutFeedback>
         </View>
-
-        {/* Time Range Selector */}
-        <View
-          style={[
-            styles.rangeSelector,
-            {
-              backgroundColor: isDark ? "#0D1117" : "#F1F5F9",
-              borderColor: theme.border,
-            },
-          ]}
-        >
-          {(["24H", "7D", "30D"] as const).map((r) => (
-            <TouchableOpacity
-              key={r}
-              onPress={() => setRange(r)}
-              activeOpacity={0.8}
-              style={[
-                styles.rangePill,
-                range === r && [
-                  styles.rangePillActive,
-                  {
-                    backgroundColor: isDark ? "#1C212C" : "#FFFFFF",
-                    borderColor: theme.border,
-                  },
-                ],
-              ]}
-            >
-              <Text
-                style={[
-                  styles.rangeText,
-                  {
-                    color:
-                      range === r ? theme.textPrimary : theme.textSecondary,
-                    fontWeight: range === r ? "700" : "500",
-                  },
-                ]}
-              >
-                {r}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Longitudinal Sparkline Graph */}
-        <View style={styles.chartContainer}>
-          <Svg width={graphWidth} height={graphHeight}>
-            <Defs>
-              <LinearGradient id="sheetGrad" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0%" stopColor={data.statusColor} stopOpacity="0.3" />
-                <Stop offset="100%" stopColor={data.statusColor} stopOpacity="0.0" />
-              </LinearGradient>
-            </Defs>
-            <Path d={areaPath} fill="url(#sheetGrad)" />
-            <Path
-              d={linePath}
-              fill="none"
-              stroke={data.statusColor}
-              strokeWidth={2.8}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </Svg>
-        </View>
-
-        {/* Recent Readings List */}
-        <View style={styles.recentSection}>
-          <Text
-            style={[
-              styles.recentHeading,
-              { color: theme.textSecondary },
-            ]}
-          >
-            Recent Logs
-          </Text>
-
-          <View
-            style={[
-              styles.readingsList,
-              {
-                backgroundColor: isDark ? "#0D1117" : "#F8FAFC",
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            {data.recentReadings.map((reading, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.readingRow,
-                  index < data.recentReadings.length - 1 && [
-                    styles.readingDivider,
-                    { borderBottomColor: theme.border },
-                  ],
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.readingTime,
-                    { color: theme.textSecondary },
-                  ]}
-                >
-                  {reading.time}
-                </Text>
-                <Text
-                  style={[
-                    styles.readingValue,
-                    { color: theme.textPrimary },
-                  ]}
-                >
-                  {reading.value} {data.unit}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      </View>
-    </View>
+      </TouchableWithoutFeedback>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    justifyContent: "flex-end",
+  },
   sheetContainer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderTopWidth: 1,
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 36,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 20,
+    gap: 14,
   },
   handleBar: {
     width: 36,
@@ -280,18 +294,17 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: "#64748B",
     alignSelf: "center",
-    marginBottom: 16,
+    marginBottom: 8,
     opacity: 0.5,
   },
   sheetHeader: {
     flexDirection: "row",
     alignItems: "flex-start",
     justifyContent: "space-between",
-    marginBottom: 16,
   },
   sheetLabel: {
     fontSize: 13,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   valueRow: {
     flexDirection: "row",
@@ -301,22 +314,22 @@ const styles = StyleSheet.create({
   },
   sheetValue: {
     fontSize: 28,
-    fontWeight: "700",
+    fontWeight: "800",
     fontVariant: ["tabular-nums"],
   },
   sheetUnit: {
     fontSize: 13,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: RADII.pill,
-    marginLeft: 4,
+    borderRadius: 9999,
+    marginLeft: 6,
   },
   statusBadgeText: {
     fontSize: 11,
-    fontWeight: "600",
+    fontWeight: "700",
   },
   closeBtn: {
     width: 32,
@@ -327,17 +340,16 @@ const styles = StyleSheet.create({
   },
   rangeSelector: {
     flexDirection: "row",
-    borderRadius: RADII.pill,
+    borderRadius: 9999,
     borderWidth: 1,
     padding: 3,
-    marginBottom: 16,
   },
   rangePill: {
     flex: 1,
     paddingVertical: 6,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: RADII.pill,
+    borderRadius: 9999,
     borderWidth: 1,
     borderColor: "transparent",
   },
@@ -348,38 +360,39 @@ const styles = StyleSheet.create({
   chartContainer: {
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 20,
+    marginVertical: 4,
   },
-  recentSection: {
-    gap: 8,
-  },
-  recentHeading: {
-    fontSize: 12,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  readingsList: {
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingHorizontal: 14,
-  },
-  readingRow: {
+  rangeIndicatorRow: {
     flexDirection: "row",
+    justifyContent: "space-around",
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  rangeItem: {
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 10,
+    gap: 2,
   },
-  readingDivider: {
-    borderBottomWidth: 1,
-  },
-  readingTime: {
-    fontSize: 13,
+  rangeLabel: {
+    fontSize: 11,
     fontWeight: "500",
   },
-  readingValue: {
-    fontSize: 13,
-    fontWeight: "600",
-    fontVariant: ["tabular-nums"],
+  rangeVal: {
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  askAviBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 16,
+    marginTop: 4,
+  },
+  askAviText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FFFFFF",
   },
 });

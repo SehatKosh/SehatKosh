@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   ActivityIndicator,
-  Dimensions,
+  Modal,
   StyleSheet,
   Text,
   TextInput,
@@ -13,18 +13,13 @@ import {
   AlertCircle,
   Check,
   ChevronDown,
-  Edit3,
-  Moon,
-  Plus,
+  MessageSquarePlus,
   RefreshCw,
   Server,
-  Sun,
   Trash2,
   X,
 } from "lucide-react-native";
-import Svg, { Path } from "react-native-svg";
-import { useAppTheme } from "../../constants/themeContext";
-import { RADII } from "../../constants/theme";
+import { useTheme } from "../../context/ThemeContext";
 import {
   AviHealthResponse,
   checkAviHealth,
@@ -38,7 +33,7 @@ interface AviHeaderControlsProps {
   onRefreshHealth: () => void;
   isCheckingHealth: boolean;
   onNewChat: () => void;
-  onSelectPastSession?: (sessionId: string) => void;
+  onClearHistory: () => void;
 }
 
 export function AviHeaderControls({
@@ -46,25 +41,26 @@ export function AviHeaderControls({
   onRefreshHealth,
   isCheckingHealth,
   onNewChat,
-  onSelectPastSession,
+  onClearHistory,
 }: AviHeaderControlsProps) {
-  const { theme, isDark, toggleTheme } = useAppTheme();
+  const { colors, isDark } = useTheme();
 
-  // Drawers and Modals
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [modelModalOpen, setModelModalOpen] = useState(false);
+  // Modals state
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
 
-  // Server endpoint modal state
+  // Server IP config state
   const [inputUrl, setInputUrl] = useState("");
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<AviHealthResponse | null>(null);
   const [saving, setSaving] = useState(false);
 
   const openServerConfig = async () => {
+    setMenuOpen(false);
     const current = await getAviBaseUrl();
     setInputUrl(current);
     setTestResult(null);
-    setModelModalOpen(true);
+    setConfigOpen(true);
   };
 
   const handleTestConnection = async () => {
@@ -89,7 +85,7 @@ export function AviHeaderControls({
     setSaving(true);
     try {
       await setAviBaseUrl(inputUrl);
-      setModelModalOpen(false);
+      setConfigOpen(false);
       onRefreshHealth();
     } finally {
       setSaving(false);
@@ -101,35 +97,34 @@ export function AviHeaderControls({
     try {
       const def = await resetAviBaseUrl();
       setInputUrl(def);
-      setModelModalOpen(false);
+      setConfigOpen(false);
       onRefreshHealth();
     } finally {
       setSaving(false);
     }
   };
 
-  // Status dot color
   const getStatusColor = () => {
     switch (health.status) {
       case "ready":
-        return "#10B981"; // Emerald
+        return "#10B981";
       case "loading":
-        return "#F59E0B"; // Amber
+        return "#F59E0B";
       case "unavailable":
-        return "#FB923C"; // Orange
+        return "#FB923C";
       default:
-        return "#F43F5E"; // Rose
+        return "#EF4444";
     }
   };
 
   return (
     <>
-      {/* ── Top Header Bar (3 Clean Elements) ───────────────────────────────── */}
+      {/* ── 2-Element Top Header: Menu on Left, Status Pill in Center, Right EMPTY ── */}
       <View style={styles.headerBar}>
-        {/* Left: 2-Bar / 3-Bar Hamburger Drawer Icon */}
+        {/* Left: 44x44px Menu Button */}
         <TouchableOpacity
-          accessibilityLabel="Open Navigation Drawer"
-          onPress={() => setDrawerOpen(true)}
+          accessibilityLabel="Open Assistant Menu"
+          onPress={() => setMenuOpen(true)}
           activeOpacity={0.7}
           style={styles.touchTarget44}
         >
@@ -137,28 +132,28 @@ export function AviHeaderControls({
             <View
               style={[
                 styles.hamburgerBar,
-                { backgroundColor: theme.textPrimary, width: 18 },
+                { backgroundColor: colors.textPrimary, width: 20 },
               ]}
             />
             <View
               style={[
                 styles.hamburgerBar,
-                { backgroundColor: theme.textPrimary, width: 12 },
+                { backgroundColor: colors.textPrimary, width: 14 },
               ]}
             />
           </View>
         </TouchableOpacity>
 
-        {/* Center: Model Context Pill (Avi MedGemma ⌵) */}
+        {/* Center: Clean Status Pill (● Avi MedGemma) */}
         <TouchableOpacity
-          accessibilityLabel="Model Switcher & Server Status"
+          accessibilityLabel="Server Status and Config"
           onPress={openServerConfig}
           activeOpacity={0.7}
           style={[
             styles.modelPill,
             {
               backgroundColor: isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9",
-              borderColor: theme.border,
+              borderColor: colors.border,
             },
           ]}
         >
@@ -171,391 +166,352 @@ export function AviHeaderControls({
           <Text
             style={[
               styles.modelPillText,
-              { color: theme.textPrimary },
+              { color: colors.textPrimary },
             ]}
           >
             Avi MedGemma
           </Text>
-          <ChevronDown size={14} color={theme.textSecondary} />
+          <ChevronDown size={14} color={colors.textSecondary} />
         </TouchableOpacity>
 
-        {/* Right: New Chat Pen Icon + User Avatar */}
-        <View style={styles.headerRightGroup}>
-          <TouchableOpacity
-            accessibilityLabel="New Chat"
-            onPress={onNewChat}
-            activeOpacity={0.7}
-            style={styles.touchTarget44}
-          >
-            <Edit3 size={19} color={theme.textPrimary} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            accessibilityLabel="Toggle Theme"
-            onPress={toggleTheme}
-            activeOpacity={0.7}
-            style={[
-              styles.avatarContainer,
-              {
-                backgroundColor: isDark ? "#1E293B" : "#E2E8F0",
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            {isDark ? (
-              <Sun size={15} color="#FBBF24" />
-            ) : (
-              <Moon size={15} color="#6366F1" />
-            )}
-          </TouchableOpacity>
-        </View>
+        {/* Right: EMPTY 44px spacer for optical symmetry */}
+        <View style={styles.touchTarget44} />
       </View>
 
-      {/* ── Slide-Out Drawer Overlay ────────────────────────────────────────── */}
-      {drawerOpen && (
-        <View style={StyleSheet.absoluteFill}>
-          <TouchableWithoutFeedback onPress={() => setDrawerOpen(false)}>
-            <View
-              style={[
-                StyleSheet.absoluteFill,
-                { backgroundColor: "rgba(0,0,0,0.6)" },
-              ]}
-            />
-          </TouchableWithoutFeedback>
-
-          <View
-            style={[
-              styles.drawerSheet,
-              {
-                backgroundColor: theme.surface,
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            {/* Drawer Header */}
-            <View style={styles.drawerHeader}>
-              <View style={styles.drawerBrandRow}>
-                <Svg width={24} height={24} viewBox="0 0 24 24">
-                  <Path
-                    d="M12 0C12 7.5 16.5 12 24 12C16.5 12 12 16.5 12 24C12 16.5 7.5 12 0 12C7.5 12 12 7.5 12 0Z"
-                    fill="#3B82F6"
-                  />
-                </Svg>
-                <Text
-                  style={[
-                    styles.drawerTitle,
-                    { color: theme.textPrimary },
-                  ]}
-                >
-                  SehatKosh Avi
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => setDrawerOpen(false)}
-                activeOpacity={0.7}
-                style={styles.drawerCloseButton}
-              >
-                <X size={18} color={theme.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Quick Actions */}
-            <TouchableOpacity
-              onPress={() => {
-                setDrawerOpen(false);
-                onNewChat();
-              }}
-              activeOpacity={0.7}
-              style={[
-                styles.drawerNewChatBtn,
-                {
-                  backgroundColor: isDark ? "#1C212C" : "#F1F5F9",
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <Plus size={16} color={theme.textPrimary} />
-              <Text
-                style={[
-                  styles.drawerNewChatText,
-                  { color: theme.textPrimary },
-                ]}
-              >
-                New Conversation
-              </Text>
-            </TouchableOpacity>
-
-            {/* Server Status in Drawer */}
-            <View
-              style={[
-                styles.drawerStatusCard,
-                {
-                  backgroundColor: isDark ? "#0A0D14" : "#F8FAFC",
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <View style={styles.drawerStatusRow}>
+      {/* ── Unmountable Menu Modal (Renders null when closed) ────────────────── */}
+      {menuOpen && (
+        <Modal
+          visible={menuOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setMenuOpen(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setMenuOpen(false)}>
+            <View style={styles.backdrop}>
+              <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
                 <View
                   style={[
-                    styles.statusDot,
-                    { backgroundColor: getStatusColor() },
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.drawerStatusLabel,
-                    { color: theme.textPrimary },
+                    styles.menuCard,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.border,
+                    },
                   ]}
                 >
-                  {health.status === "ready"
-                    ? "MedGemma 1.5 4B Ready"
-                    : health.message}
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => {
-                  setDrawerOpen(false);
-                  openServerConfig();
-                }}
-                activeOpacity={0.7}
-                style={[
-                  styles.configServerPill,
-                  { borderColor: theme.border },
-                ]}
-              >
-                <Server size={12} color={theme.textSecondary} />
-                <Text
-                  style={[
-                    styles.configServerText,
-                    { color: theme.textSecondary },
-                  ]}
-                >
-                  Configure Server
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Appearance Switch */}
-            <View style={styles.drawerFooter}>
-              <TouchableOpacity
-                onPress={toggleTheme}
-                activeOpacity={0.7}
-                style={[
-                  styles.themeToggleRow,
-                  { borderColor: theme.border },
-                ]}
-              >
-                {isDark ? (
-                  <Sun size={16} color="#FBBF24" />
-                ) : (
-                  <Moon size={16} color="#6366F1" />
-                )}
-                <Text
-                  style={[
-                    styles.themeToggleText,
-                    { color: theme.textPrimary },
-                  ]}
-                >
-                  {isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* ── Server Endpoint Config Modal ────────────────────────────────────── */}
-      {modelModalOpen && (
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              backgroundColor: "rgba(0, 0, 0, 0.7)",
-              zIndex: 99999,
-              elevation: 99999,
-              justifyContent: "center",
-              alignItems: "center",
-              paddingHorizontal: 20,
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.configModalCard,
-              {
-                backgroundColor: theme.surfaceElevated,
-                borderColor: theme.borderActive,
-              },
-            ]}
-          >
-            {/* Modal Header */}
-            <View style={styles.configModalHeader}>
-              <View style={styles.configHeaderTitleRow}>
-                <Server size={18} color="#3B82F6" />
-                <Text
-                  style={[
-                    styles.configModalTitle,
-                    { color: theme.textPrimary },
-                  ]}
-                >
-                  Avi GPU Engine
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => setModelModalOpen(false)}
-                activeOpacity={0.7}
-                style={styles.modalCloseBtn}
-              >
-                <X size={16} color={theme.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Current Health Readout */}
-            <View
-              style={[
-                styles.healthReadoutBadge,
-                {
-                  backgroundColor: isDark ? "#0D1117" : "#F1F5F9",
-                  borderColor: theme.border,
-                },
-              ]}
-            >
-              <View
-                style={[
-                  styles.statusDot,
-                  { backgroundColor: getStatusColor() },
-                ]}
-              />
-              <Text
-                style={[
-                  styles.healthReadoutText,
-                  { color: theme.textPrimary },
-                ]}
-              >
-                {health.status === "ready"
-                  ? "Connected • MedGemma 1.5 4B (RTX 4000 Ada)"
-                  : health.message}
-              </Text>
-            </View>
-
-            {/* Endpoint URL Input */}
-            <View style={styles.inputGroup}>
-              <Text
-                style={[
-                  styles.inputLabel,
-                  { color: theme.textSecondary },
-                ]}
-              >
-                Endpoint URL
-              </Text>
-              <TextInput
-                value={inputUrl}
-                onChangeText={setInputUrl}
-                placeholder="http://172.17.170.87:10000"
-                placeholderTextColor={theme.inputPlaceholder}
-                autoCapitalize="none"
-                autoCorrect={false}
-                style={[
-                  styles.endpointInput,
-                  {
-                    backgroundColor: isDark ? "#0A0D14" : "#FFFFFF",
-                    borderColor: theme.border,
-                    color: theme.textPrimary,
-                  },
-                ]}
-              />
-            </View>
-
-            {/* Test Connection Output */}
-            {testResult && (
-              <View
-                style={[
-                  styles.testResultBanner,
-                  testResult.status === "ready"
-                    ? styles.testResultSuccess
-                    : styles.testResultFail,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.testResultText,
-                    testResult.status === "ready"
-                      ? { color: "#10B981" }
-                      : { color: "#F43F5E" },
-                  ]}
-                >
-                  {testResult.status === "ready"
-                    ? `Ready • ${testResult.latencyMs}ms`
-                    : testResult.message}
-                </Text>
-              </View>
-            )}
-
-            {/* Action Buttons */}
-            <View style={styles.modalActionRow}>
-              <TouchableOpacity
-                onPress={handleTestConnection}
-                disabled={testing}
-                activeOpacity={0.7}
-                style={[
-                  styles.secondaryBtn,
-                  { borderColor: theme.border },
-                ]}
-              >
-                {testing ? (
-                  <ActivityIndicator size="small" color="#3B82F6" />
-                ) : (
-                  <>
-                    <RefreshCw size={13} color={theme.textPrimary} />
+                  {/* Menu Header */}
+                  <View style={styles.menuHeaderRow}>
                     <Text
                       style={[
-                        styles.secondaryBtnText,
-                        { color: theme.textPrimary },
+                        styles.menuTitle,
+                        { color: colors.textPrimary },
                       ]}
                     >
-                      Test
+                      Avi Assistant
                     </Text>
-                  </>
-                )}
-              </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setMenuOpen(false)}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.closeBtn,
+                        { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
+                      ]}
+                    >
+                      <X size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
 
-              <TouchableOpacity
-                onPress={handleSaveUrl}
-                disabled={saving}
-                activeOpacity={0.7}
-                style={styles.primaryBtn}
-              >
-                <Check size={14} color="#FFFFFF" />
-                <Text style={styles.primaryBtnText}>Save</Text>
-              </TouchableOpacity>
+                  {/* Actions */}
+                  <View style={styles.menuActions}>
+                    {/* (1) New Conversation */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        setMenuOpen(false);
+                        onNewChat();
+                      }}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.menuActionItem,
+                        {
+                          backgroundColor: isDark ? "#141822" : "#F8FAFC",
+                          borderColor: colors.border,
+                        },
+                      ]}
+                    >
+                      <MessageSquarePlus size={18} color="#38BDF8" />
+                      <Text
+                        style={[
+                          styles.menuActionText,
+                          { color: colors.textPrimary },
+                        ]}
+                      >
+                        New Conversation
+                      </Text>
+                    </TouchableOpacity>
+
+                    {/* (2) Avi Server IP Config */}
+                    <TouchableOpacity
+                      onPress={openServerConfig}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.menuActionItem,
+                        {
+                          backgroundColor: isDark ? "#141822" : "#F8FAFC",
+                          borderColor: colors.border,
+                        },
+                      ]}
+                    >
+                      <Server size={18} color="#10B981" />
+                      <View style={styles.menuActionMeta}>
+                        <Text
+                          style={[
+                            styles.menuActionText,
+                            { color: colors.textPrimary },
+                          ]}
+                        >
+                          Avi Server IP Config
+                        </Text>
+                        <Text
+                          style={[
+                            styles.menuActionSub,
+                            { color: colors.textSecondary },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {health.status === "ready"
+                            ? "Connected (RTX 4000 Ada)"
+                            : "Offline / Switch IP"}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* (3) Clear Chat History */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        setMenuOpen(false);
+                        onClearHistory();
+                      }}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.menuActionItem,
+                        {
+                          backgroundColor: isDark
+                            ? "rgba(239, 68, 68, 0.12)"
+                            : "#FEF2F2",
+                          borderColor: isDark
+                            ? "rgba(239, 68, 68, 0.3)"
+                            : "#FECDD3",
+                        },
+                      ]}
+                    >
+                      <Trash2 size={18} color="#EF4444" />
+                      <Text
+                        style={[
+                          styles.menuActionText,
+                          { color: "#EF4444" },
+                        ]}
+                      >
+                        Clear Chat History
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </TouchableWithoutFeedback>
             </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      )}
 
-            {/* Reset Default */}
-            <TouchableOpacity
-              onPress={handleResetDefault}
-              activeOpacity={0.7}
-              style={styles.resetDefaultLink}
-            >
-              <Text
-                style={[
-                  styles.resetDefaultText,
-                  { color: theme.textSecondary },
-                ]}
-              >
-                Reset to Default Endpoint
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+      {/* ── Unmountable Server IP Config Modal ──────────────────────────────── */}
+      {configOpen && (
+        <Modal
+          visible={configOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setConfigOpen(false)}
+        >
+          <TouchableWithoutFeedback onPress={() => setConfigOpen(false)}>
+            <View style={styles.backdrop}>
+              <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+                <View
+                  style={[
+                    styles.configModalCard,
+                    {
+                      backgroundColor: colors.surfaceElevated,
+                      borderColor: colors.borderStrong,
+                    },
+                  ]}
+                >
+                  <View style={styles.menuHeaderRow}>
+                    <View style={styles.configHeaderTitleRow}>
+                      <Server size={18} color="#3B82F6" />
+                      <Text
+                        style={[
+                          styles.menuTitle,
+                          { color: colors.textPrimary },
+                        ]}
+                      >
+                        Avi GPU Server IP
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => setConfigOpen(false)}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.closeBtn,
+                        { backgroundColor: isDark ? "#1E293B" : "#F1F5F9" },
+                      ]}
+                    >
+                      <X size={16} color={colors.textSecondary} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Readout */}
+                  <View
+                    style={[
+                      styles.healthReadoutBadge,
+                      {
+                        backgroundColor: isDark ? "#0D1117" : "#F1F5F9",
+                        borderColor: colors.border,
+                      },
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.statusDot,
+                        { backgroundColor: getStatusColor() },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.healthReadoutText,
+                        { color: colors.textPrimary },
+                      ]}
+                    >
+                      {health.status === "ready"
+                        ? "Connected • MedGemma 1.5 4B (RTX 4000 Ada)"
+                        : health.message}
+                    </Text>
+                  </View>
+
+                  {/* Input */}
+                  <View style={styles.inputGroup}>
+                    <Text
+                      style={[
+                        styles.inputLabel,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      Server Endpoint URL
+                    </Text>
+                    <TextInput
+                      value={inputUrl}
+                      onChangeText={setInputUrl}
+                      placeholder="http://172.17.170.87:10000"
+                      placeholderTextColor={colors.textMuted}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      style={[
+                        styles.endpointInput,
+                        {
+                          backgroundColor: isDark ? "#0A0D14" : "#FFFFFF",
+                          borderColor: colors.border,
+                          color: colors.textPrimary,
+                        },
+                      ]}
+                    />
+                  </View>
+
+                  {/* Test Result */}
+                  {testResult && (
+                    <View
+                      style={[
+                        styles.testBanner,
+                        testResult.status === "ready"
+                          ? styles.testSuccess
+                          : styles.testFail,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.testBannerText,
+                          {
+                            color:
+                              testResult.status === "ready"
+                                ? "#10B981"
+                                : "#EF4444",
+                          },
+                        ]}
+                      >
+                        {testResult.status === "ready"
+                          ? `Ready • ${testResult.latencyMs}ms latency`
+                          : testResult.message}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Actions */}
+                  <View style={styles.modalActionRow}>
+                    <TouchableOpacity
+                      onPress={handleTestConnection}
+                      disabled={testing}
+                      activeOpacity={0.7}
+                      style={[
+                        styles.secondaryBtn,
+                        { borderColor: colors.border },
+                      ]}
+                    >
+                      {testing ? (
+                        <ActivityIndicator size="small" color="#3B82F6" />
+                      ) : (
+                        <>
+                          <RefreshCw size={13} color={colors.textPrimary} />
+                          <Text
+                            style={[
+                              styles.secondaryBtnText,
+                              { color: colors.textPrimary },
+                            ]}
+                          >
+                            Test
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={handleSaveUrl}
+                      disabled={saving}
+                      activeOpacity={0.7}
+                      style={styles.primaryBtn}
+                    >
+                      <Check size={14} color="#FFFFFF" />
+                      <Text style={styles.primaryBtnText}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Reset Default */}
+                  <TouchableOpacity
+                    onPress={handleResetDefault}
+                    activeOpacity={0.7}
+                    style={styles.resetDefaultLink}
+                  >
+                    <Text
+                      style={[
+                        styles.resetDefaultText,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      Reset to Default Lab Endpoint
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
       )}
     </>
   );
 }
-
-const { width } = Dimensions.get("window");
 
 const styles = StyleSheet.create({
   headerBar: {
@@ -573,7 +529,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   hamburgerIcon: {
-    gap: 5,
+    gap: 6,
     justifyContent: "center",
   },
   hamburgerBar: {
@@ -586,7 +542,7 @@ const styles = StyleSheet.create({
     gap: 7,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: RADII.pill,
+    borderRadius: 9999,
     borderWidth: 1,
   },
   statusDot: {
@@ -599,133 +555,82 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: -0.2,
   },
-  headerRightGroup: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  avatarContainer: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: "center",
+  backdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
     justifyContent: "center",
-    borderWidth: 1,
-  },
-  drawerSheet: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: Math.min(width * 0.82, 320),
-    borderRightWidth: 1,
-    paddingTop: 54,
+    alignItems: "center",
     paddingHorizontal: 20,
-    paddingBottom: 24,
-    justifyContent: "space-between",
   },
-  drawerHeader: {
+  menuCard: {
+    width: "100%",
+    maxWidth: 340,
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 20,
+    gap: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  menuHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 24,
   },
-  drawerBrandRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  drawerTitle: {
+  menuTitle: {
     fontSize: 17,
     fontWeight: "700",
   },
-  drawerCloseButton: {
-    padding: 6,
+  closeBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  drawerNewChatBtn: {
+  menuActions: {
+    gap: 10,
+  },
+  menuActionItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    paddingVertical: 12,
+    gap: 12,
     paddingHorizontal: 16,
-    borderRadius: 14,
+    paddingVertical: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    marginBottom: 20,
   },
-  drawerNewChatText: {
+  menuActionMeta: {
+    flex: 1,
+  },
+  menuActionText: {
     fontSize: 14,
     fontWeight: "600",
   },
-  drawerStatusCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 14,
-    gap: 10,
-  },
-  drawerStatusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  drawerStatusLabel: {
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  configServerPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: RADII.pill,
-    borderWidth: 1,
-  },
-  configServerText: {
+  menuActionSub: {
     fontSize: 11,
-    fontWeight: "500",
-  },
-  drawerFooter: {
-    marginTop: "auto",
-    paddingTop: 16,
-  },
-  themeToggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    borderWidth: 1,
-  },
-  themeToggleText: {
-    fontSize: 13,
-    fontWeight: "500",
+    marginTop: 2,
   },
   configModalCard: {
     width: "100%",
     maxWidth: 360,
-    borderRadius: RADII.modal,
+    borderRadius: 26,
     borderWidth: 1,
-    padding: 20,
+    padding: 22,
     gap: 14,
-  },
-  configModalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 20,
+    elevation: 24,
   },
   configHeaderTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-  },
-  configModalTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  modalCloseBtn: {
-    padding: 4,
   },
   healthReadoutBadge: {
     flexDirection: "row",
@@ -748,25 +653,25 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   endpointInput: {
-    borderRadius: 12,
+    borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 13,
     fontFamily: "monospace",
   },
-  testResultBanner: {
+  testBanner: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
   },
-  testResultSuccess: {
+  testSuccess: {
     backgroundColor: "rgba(16, 185, 129, 0.12)",
   },
-  testResultFail: {
-    backgroundColor: "rgba(244, 63, 94, 0.12)",
+  testFail: {
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
   },
-  testResultText: {
+  testBannerText: {
     fontSize: 12,
     fontWeight: "600",
   },
@@ -782,8 +687,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    paddingVertical: 11,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 14,
     borderWidth: 1,
   },
   secondaryBtnText: {
@@ -796,8 +701,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
-    paddingVertical: 11,
-    borderRadius: 12,
+    paddingVertical: 12,
+    borderRadius: 14,
     backgroundColor: "#3B82F6",
   },
   primaryBtnText: {

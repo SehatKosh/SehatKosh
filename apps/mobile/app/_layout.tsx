@@ -20,6 +20,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { GlobalOverlays } from "../components/GlobalOverlays";
 import { ThemeProvider, useAppTheme } from "../constants/themeContext";
+import { PatientProvider } from "../context/PatientContext";
 
 const queryClient = new QueryClient();
 
@@ -83,7 +84,9 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <BottomSheetModalProvider>
             <ThemeProvider>
-              <RootContent />
+              <PatientProvider>
+                <RootContent />
+              </PatientProvider>
             </ThemeProvider>
           </BottomSheetModalProvider>
         </QueryClientProvider>

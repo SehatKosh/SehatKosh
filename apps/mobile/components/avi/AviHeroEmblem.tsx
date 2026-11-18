@@ -7,8 +7,14 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
-import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
-import { useAppTheme } from "../../constants/themeContext";
+import Svg, {
+  Defs,
+  LinearGradient,
+  Path,
+  Rect,
+  Stop,
+} from "react-native-svg";
+import { useTheme } from "../../context/ThemeContext";
 
 const AnimatedView = Animated.View as any;
 
@@ -19,7 +25,7 @@ interface AviHeroEmblemProps {
 export function AviHeroEmblem({
   prompt = "What should we focus on?",
 }: AviHeroEmblemProps) {
-  const { theme, isDark } = useAppTheme();
+  const { colors, isDark } = useTheme();
 
   // Subtle breathing glow animation
   const glowScale = useSharedValue(1);
@@ -27,12 +33,12 @@ export function AviHeroEmblem({
 
   useEffect(() => {
     glowScale.value = withRepeat(
-      withTiming(1.35, { duration: 2400, easing: Easing.inOut(Easing.ease) }),
+      withTiming(1.3, { duration: 2600, easing: Easing.inOut(Easing.ease) }),
       -1,
       true
     );
     glowOpacity.value = withRepeat(
-      withTiming(0.75, { duration: 2400, easing: Easing.inOut(Easing.ease) }),
+      withTiming(0.7, { duration: 2600, easing: Easing.inOut(Easing.ease) }),
       -1,
       true
     );
@@ -47,42 +53,75 @@ export function AviHeroEmblem({
 
   return (
     <View style={styles.container}>
-      {/* Ambient Breathing Glow */}
+      {/* ── SehatKosh Clinical Shield with Breathing Glow ────────────── */}
       <View style={styles.emblemWrapper}>
         <AnimatedView
           style={[
             styles.glowRing,
             {
               backgroundColor: isDark
-                ? "rgba(59, 130, 246, 0.28)"
-                : "rgba(59, 130, 246, 0.15)",
+                ? "rgba(16, 185, 129, 0.25)"
+                : "rgba(16, 185, 129, 0.15)",
             },
             animatedGlowStyle,
           ]}
         />
 
-        {/* 4-Point Gemini/Avi Star Emblem with Rich Multi-Color Gradient */}
-        <Svg width={46} height={46} viewBox="0 0 24 24">
+        {/* Custom Clinical Shield Emblem */}
+        <Svg width={54} height={54} viewBox="0 0 48 48">
           <Defs>
-            <LinearGradient id="aviStarGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <Stop offset="0%" stopColor="#FB7185" />
-              <Stop offset="30%" stopColor="#FBBF24" />
-              <Stop offset="65%" stopColor="#38BDF8" />
-              <Stop offset="100%" stopColor="#818CF8" />
+            <LinearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <Stop offset="0%" stopColor="#34D399" />
+              <Stop offset="50%" stopColor="#10B981" />
+              <Stop offset="100%" stopColor="#0D9488" />
+            </LinearGradient>
+            <LinearGradient id="pulseGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <Stop offset="0%" stopColor="#FFFFFF" />
+              <Stop offset="100%" stopColor="#E0F2FE" />
             </LinearGradient>
           </Defs>
+
+          {/* Clinical Shield Outline & Fill */}
           <Path
-            d="M12 0C12 7.5 16.5 12 24 12C16.5 12 12 16.5 12 24C12 16.5 7.5 12 0 12C7.5 12 12 7.5 12 0Z"
-            fill="url(#aviStarGrad)"
+            d="M24 4L8 10V22C8 32.5 14.8 41.5 24 44C33.2 41.5 40 32.5 40 22V10L24 4Z"
+            fill="url(#shieldGrad)"
+          />
+
+          {/* Central Medical Cross Node */}
+          <Rect
+            x="22"
+            y="14"
+            width="4"
+            height="18"
+            rx="2"
+            fill="rgba(255, 255, 255, 0.35)"
+          />
+          <Rect
+            x="15"
+            y="21"
+            width="18"
+            height="4"
+            rx="2"
+            fill="rgba(255, 255, 255, 0.35)"
+          />
+
+          {/* ECG Pulse Wave Overlay */}
+          <Path
+            d="M13 23H18L21 16L25 30L28 20L31 23H35"
+            stroke="url(#pulseGrad)"
+            strokeWidth="2.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            fill="none"
           />
         </Svg>
       </View>
 
-      {/* Hero Prompt Headline - Exact match to Gemini Mobile */}
+      {/* Hero Prompt Headline */}
       <Text
         style={[
           styles.heroPrompt,
-          { color: theme.textPrimary },
+          { color: colors.textPrimary },
         ]}
       >
         {prompt}
@@ -96,21 +135,21 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 24,
-    paddingVertical: 40,
+    paddingVertical: 36,
   },
   emblemWrapper: {
-    width: 60,
-    height: 60,
+    width: 68,
+    height: 68,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 26,
+    marginBottom: 24,
     position: "relative",
   },
   glowRing: {
     position: "absolute",
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
   },
   heroPrompt: {
     fontSize: 32,

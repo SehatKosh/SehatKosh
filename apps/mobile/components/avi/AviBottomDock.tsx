@@ -9,13 +9,9 @@ import {
 } from "react-native";
 import {
   Camera,
-  FileText,
   Image as ImageIcon,
-  Mic,
-  Plus,
+  Paperclip,
   Send,
-  Shield,
-  ShieldCheck,
   Square,
   X,
 } from "lucide-react-native";
@@ -23,8 +19,7 @@ import Animated, {
   FadeInDown,
   FadeOutDown,
 } from "react-native-reanimated";
-import { useAppTheme } from "../../constants/themeContext";
-import { RADII } from "../../constants/theme";
+import { useTheme } from "../../context/ThemeContext";
 import { PreparedImage } from "../../services/aviClient";
 
 const AnimatedView = Animated.View as any;
@@ -39,10 +34,6 @@ interface AviBottomDockProps {
   onClearImage: () => void;
   onTakePhoto: () => void;
   onPickGallery: () => void;
-  includeHealthProfile: boolean;
-  onToggleHealthProfile: () => void;
-  mode: "chat" | "scan";
-  onModeChange: (mode: "chat" | "scan") => void;
   inputRef?: React.RefObject<any>;
 }
 
@@ -56,112 +47,30 @@ export function AviBottomDock({
   onClearImage,
   onTakePhoto,
   onPickGallery,
-  includeHealthProfile,
-  onToggleHealthProfile,
-  mode,
-  onModeChange,
   inputRef,
 }: AviBottomDockProps) {
-  const { theme, isDark } = useAppTheme();
+  const { colors, isDark } = useTheme();
   const [trayOpen, setTrayOpen] = useState(false);
 
   const canSend = Boolean(input.trim() || selectedImage) && !isStreaming;
 
-  const handleModePress = (newMode: "chat" | "scan") => {
-    onModeChange(newMode);
-    if (newMode === "scan") {
-      onTakePhoto();
-    }
-  };
-
   return (
     <View style={styles.outerContainer}>
-      {/* ── Mode Segmented Pill (Floating Above Dock) ─────────────────────── */}
-      <View style={styles.modePillRow}>
-        <View
-          style={[
-            styles.modePillContainer,
-            {
-              backgroundColor: isDark ? "rgba(18, 21, 28, 0.9)" : "#F1F5F9",
-              borderColor: theme.border,
-            },
-          ]}
-        >
-          <TouchableOpacity
-            accessibilityLabel="Chat Mode"
-            onPress={() => handleModePress("chat")}
-            activeOpacity={0.8}
-            style={[
-              styles.modeSegment,
-              mode === "chat" && [
-                styles.modeSegmentActive,
-                {
-                  backgroundColor: isDark ? "#1C212C" : "#FFFFFF",
-                  borderColor: isDark ? theme.border : "#CBD5E1",
-                },
-              ],
-            ]}
-          >
-            <Text
-              style={[
-                styles.modeSegmentText,
-                {
-                  color:
-                    mode === "chat" ? theme.textPrimary : theme.textSecondary,
-                  fontWeight: mode === "chat" ? "600" : "500",
-                },
-              ]}
-            >
-              Chat
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            accessibilityLabel="Scan Prescription Mode"
-            onPress={() => handleModePress("scan")}
-            activeOpacity={0.8}
-            style={[
-              styles.modeSegment,
-              mode === "scan" && [
-                styles.modeSegmentActive,
-                {
-                  backgroundColor: isDark ? "#1C212C" : "#FFFFFF",
-                  borderColor: isDark ? theme.border : "#CBD5E1",
-                },
-              ],
-            ]}
-          >
-            <Text
-              style={[
-                styles.modeSegmentText,
-                {
-                  color:
-                    mode === "scan" ? theme.textPrimary : theme.textSecondary,
-                  fontWeight: mode === "scan" ? "600" : "500",
-                },
-              ]}
-            >
-              Scan Rx
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* ── Capsule Expandable Tray (+ Menu) ──────────────────────────────── */}
+      {/* ── Capsule Expandable Tray (Camera & Gallery ONLY) ────────────────── */}
       {trayOpen && (
         <AnimatedView
-          entering={FadeInDown.duration(180)}
-          exiting={FadeOutDown.duration(150)}
+          entering={FadeInDown.duration(160)}
+          exiting={FadeOutDown.duration(140)}
           style={[
             styles.trayCard,
             {
-              backgroundColor: theme.surfaceElevated,
-              borderColor: theme.borderActive,
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.borderStrong,
             },
           ]}
         >
           <View style={styles.trayRow}>
-            {/* Camera */}
+            {/* Camera Option */}
             <TouchableOpacity
               onPress={() => {
                 setTrayOpen(false);
@@ -171,23 +80,23 @@ export function AviBottomDock({
               style={[
                 styles.trayOptionBtn,
                 {
-                  backgroundColor: isDark ? "#12151C" : "#F8FAFC",
-                  borderColor: theme.border,
+                  backgroundColor: isDark ? "#141822" : "#F8FAFC",
+                  borderColor: colors.border,
                 },
               ]}
             >
-              <Camera size={18} color="#38BDF8" />
+              <Camera size={19} color="#38BDF8" />
               <Text
                 style={[
                   styles.trayOptionText,
-                  { color: theme.textPrimary },
+                  { color: colors.textPrimary },
                 ]}
               >
                 Camera
               </Text>
             </TouchableOpacity>
 
-            {/* Gallery */}
+            {/* Gallery Option */}
             <TouchableOpacity
               onPress={() => {
                 setTrayOpen(false);
@@ -197,72 +106,33 @@ export function AviBottomDock({
               style={[
                 styles.trayOptionBtn,
                 {
-                  backgroundColor: isDark ? "#12151C" : "#F8FAFC",
-                  borderColor: theme.border,
+                  backgroundColor: isDark ? "#141822" : "#F8FAFC",
+                  borderColor: colors.border,
                 },
               ]}
             >
-              <ImageIcon size={18} color="#A78BFA" />
+              <ImageIcon size={19} color="#A78BFA" />
               <Text
                 style={[
                   styles.trayOptionText,
-                  { color: theme.textPrimary },
+                  { color: colors.textPrimary },
                 ]}
               >
                 Gallery
-              </Text>
-            </TouchableOpacity>
-
-            {/* Health Passport Context Toggle */}
-            <TouchableOpacity
-              onPress={() => {
-                onToggleHealthProfile();
-              }}
-              activeOpacity={0.7}
-              style={[
-                styles.trayOptionBtn,
-                {
-                  backgroundColor: includeHealthProfile
-                    ? "rgba(16, 185, 129, 0.12)"
-                    : isDark
-                    ? "#12151C"
-                    : "#F8FAFC",
-                  borderColor: includeHealthProfile
-                    ? "#10B981"
-                    : theme.border,
-                },
-              ]}
-            >
-              {includeHealthProfile ? (
-                <ShieldCheck size={18} color="#10B981" />
-              ) : (
-                <Shield size={18} color={theme.textMuted} />
-              )}
-              <Text
-                style={[
-                  styles.trayOptionText,
-                  {
-                    color: includeHealthProfile
-                      ? "#10B981"
-                      : theme.textSecondary,
-                  },
-                ]}
-              >
-                Passport
               </Text>
             </TouchableOpacity>
           </View>
         </AnimatedView>
       )}
 
-      {/* ── Image Attachment Strip (if image selected) ────────────────────── */}
+      {/* ── Image Attachment Strip (if attached) ───────────────────────────── */}
       {selectedImage && (
         <View
           style={[
             styles.attachedImageStrip,
             {
-              backgroundColor: theme.surface,
-              borderColor: theme.border,
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
             },
           ]}
         >
@@ -275,13 +145,13 @@ export function AviBottomDock({
             <Text
               style={[
                 styles.attachedName,
-                { color: theme.textPrimary },
+                { color: colors.textPrimary },
               ]}
               numberOfLines={1}
             >
               {selectedImage.name}
             </Text>
-            <Text style={[styles.attachedSize, { color: theme.textMuted }]}>
+            <Text style={[styles.attachedSize, { color: colors.textMuted }]}>
               {selectedImage.sizeBytes
                 ? `${Math.round(selectedImage.sizeBytes / 1024)} KB`
                 : "Image attached"}
@@ -292,33 +162,31 @@ export function AviBottomDock({
             activeOpacity={0.7}
             style={styles.clearImageBtn}
           >
-            <X size={15} color={theme.textSecondary} />
+            <X size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
       )}
 
-      {/* ── Floating Capsule Dock (Exact Gemini Spatial Layout) ───────────── */}
+      {/* ── Taller Ergonomic Floating Dock Capsule (minHeight: 62, borderRadius: 31) ── */}
       <View
         style={[
           styles.dockCapsule,
           {
-            backgroundColor: theme.dockBg,
-            borderColor: theme.dockBorder,
-            shadowColor: "#3B82F6",
+            backgroundColor: colors.dockBg,
+            borderColor: colors.dockBorder,
           },
         ]}
       >
-        {/* Left: '+' Attachment Button */}
+        {/* Left: Paperclip Button (44x44px touch target) */}
         <TouchableOpacity
-          accessibilityLabel="Add Attachments"
+          accessibilityLabel="Attach Prescription or Lab Document"
           onPress={() => setTrayOpen((prev) => !prev)}
           activeOpacity={0.7}
-          style={styles.dockIconButton}
+          style={styles.touchTarget44}
         >
-          <Plus
-            size={22}
-            color={trayOpen ? "#3B82F6" : theme.textPrimary}
-            style={trayOpen ? { transform: [{ rotate: "45deg" }] } : undefined}
+          <Paperclip
+            size={20}
+            color={trayOpen ? "#38BDF8" : colors.textPrimary}
           />
         </TouchableOpacity>
 
@@ -328,7 +196,7 @@ export function AviBottomDock({
           value={input}
           onChangeText={onInputChange}
           placeholder="Ask Avi"
-          placeholderTextColor={theme.inputPlaceholder}
+          placeholderTextColor={colors.textMuted}
           multiline
           maxLength={800}
           editable={!isStreaming}
@@ -339,20 +207,11 @@ export function AviBottomDock({
           blurOnSubmit={false}
           style={[
             styles.dockInput,
-            { color: theme.textPrimary },
+            { color: colors.textPrimary },
           ]}
         />
 
-        {/* Right: Mic Button */}
-        <TouchableOpacity
-          accessibilityLabel="Voice Input"
-          activeOpacity={0.7}
-          style={styles.dockIconButton}
-        >
-          <Mic size={20} color={theme.textSecondary} />
-        </TouchableOpacity>
-
-        {/* Right: Circular Send / Waveform / Stop Button */}
+        {/* Right: Circular Send / Stop Button ONLY (No Mic) */}
         {isStreaming ? (
           <TouchableOpacity
             accessibilityLabel="Stop Generation"
@@ -385,8 +244,8 @@ export function AviBottomDock({
             ]}
           >
             <Send
-              size={15}
-              color={canSend ? "#FFFFFF" : theme.textMuted}
+              size={16}
+              color={canSend ? "#FFFFFF" : colors.textMuted}
             />
           </TouchableOpacity>
         )}
@@ -398,36 +257,7 @@ export function AviBottomDock({
 const styles = StyleSheet.create({
   outerContainer: {
     paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  modePillRow: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 10,
-  },
-  modePillContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: RADII.pill,
-    borderWidth: 1,
-    padding: 3,
-  },
-  modeSegment: {
-    paddingHorizontal: 18,
-    paddingVertical: 6,
-    borderRadius: RADII.pill,
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-  modeSegmentActive: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  modeSegmentText: {
-    fontSize: 13,
+    paddingTop: 6,
   },
   trayCard: {
     borderRadius: 20,
@@ -439,34 +269,34 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
-    gap: 8,
+    gap: 12,
   },
   trayOptionBtn: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
+    gap: 8,
+    paddingVertical: 12,
     borderRadius: 14,
     borderWidth: 1,
   },
   trayOptionText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "600",
   },
   attachedImageStrip: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 8,
-    borderRadius: 16,
+    padding: 10,
+    borderRadius: 18,
     borderWidth: 1,
     marginBottom: 8,
   },
   attachedThumbnail: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    width: 38,
+    height: 38,
+    borderRadius: 10,
   },
   attachedMeta: {
     flex: 1,
@@ -486,19 +316,20 @@ const styles = StyleSheet.create({
   dockCapsule: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: RADII.dock,
+    borderRadius: 31,
     borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    minHeight: 56,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 62,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
     shadowRadius: 14,
-    elevation: 10,
+    elevation: 8,
   },
-  dockIconButton: {
-    width: 40,
-    height: 40,
+  touchTarget44: {
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -506,14 +337,14 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     lineHeight: 22,
-    maxHeight: 100,
+    maxHeight: 110,
     paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   dockActionButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
     marginLeft: 4,
@@ -523,6 +354,6 @@ const styles = StyleSheet.create({
   },
   dockSendInactive: {},
   dockStopButton: {
-    backgroundColor: "#F43F5E",
+    backgroundColor: "#EF4444",
   },
 });

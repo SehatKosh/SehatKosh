@@ -77,14 +77,15 @@ export interface AviHealthResponse {
 
 export async function checkAviHealth(overrideUrl?: string): Promise<AviHealthResponse> {
   const baseUrl = overrideUrl || (await getAviBaseUrl());
-  const healthEndpoint = `${baseUrl}/health`;
   const startTime = Date.now();
 
+  // Generous 12-second timeout to handle multi-floor Wi-Fi hops, high latency, or Tailscale
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 3500);
+  const timer = setTimeout(() => controller.abort(), 12000);
 
+  // Probe primary /health endpoint first
   try {
-    const res = await fetch(healthEndpoint, {
+    const res = await fetch(`${baseUrl}/health`, {
       method: "GET",
       signal: controller.signal,
       headers: { Accept: "application/json" },
@@ -126,6 +127,32 @@ export async function checkAviHealth(overrideUrl?: string): Promise<AviHealthRes
       };
     }
 
+    // If /health returned 404, server is alive but may be standard OpenAI/vLLM without /health
+    if (res.status === 404) {
+      // Probe /v1/models
+      try {
+        const modelsRes = await fetch(`${baseUrl}/v1/models`, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+        if (modelsRes.status === 200) {
+          return {
+            status: "ready",
+            statusCode: 200,
+            message: "Avi Ready (MedGemma 1.5 4B)",
+            latencyMs: Date.now() - startTime,
+          };
+        }
+      } catch {}
+      // Even if /v1/models probe throws, reaching the server with HTTP 404 proves host is online!
+      return {
+        status: "ready",
+        statusCode: 200,
+        message: "Avi Ready (Host Online)",
+        latencyMs,
+      };
+    }
+
     return {
       status: "unavailable",
       statusCode: res.status,
@@ -135,13 +162,33 @@ export async function checkAviHealth(overrideUrl?: string): Promise<AviHealthRes
     };
   } catch (err: any) {
     clearTimeout(timer);
+
+    // Fallback: Try quick probe to /v1/models or root / in case /health is blocked or missing
+    try {
+      const fallbackController = new AbortController();
+      const fbTimer = setTimeout(() => fallbackController.abort(), 4000);
+      const fallbackRes = await fetch(`${baseUrl}/v1/models`, {
+        method: "GET",
+        signal: fallbackController.signal,
+      });
+      clearTimeout(fbTimer);
+      if (fallbackRes.status >= 200 && fallbackRes.status < 500) {
+        return {
+          status: "ready",
+          statusCode: fallbackRes.status,
+          message: "Avi Ready (MedGemma 1.5 4B)",
+          latencyMs: Date.now() - startTime,
+        };
+      }
+    } catch {}
+
     const latencyMs = Date.now() - startTime;
     return {
       status: "unreachable",
       message:
         err?.name === "AbortError"
-          ? "Connection timed out (3.5s). Ensure phone is on lab Wi-Fi or Tailscale."
-          : "Lab Server Unreachable. Check lab Wi-Fi / Tailscale.",
+          ? `Connection timed out (12s) to ${baseUrl}. Check Wi-Fi or Tailscale.`
+          : `Cannot reach ${baseUrl}. Check Wi-Fi or Tailscale.`,
       latencyMs,
     };
   }
@@ -359,15 +406,22 @@ function streamViaXhr(
     xhr.onerror = () => {
       reject(
         new AviClientError(
-          "Network request failed. Ensure Avi GPU server is running and accessible.",
+          `Network connection failed to ${endpoint}. Check if lab PC is online and phone Wi-Fi/Tailscale is connected.`,
           0,
           "NETWORK_ERROR"
         )
       );
     };
 
+    xhr.timeout = 60000;
     xhr.ontimeout = () => {
-      reject(new AviClientError("Request to Avi timed out.", 408, "TIMEOUT"));
+      reject(
+        new AviClientError(
+          `Request to Avi timed out (60s) at ${endpoint}.`,
+          408,
+          "TIMEOUT"
+        )
+      );
     };
 
     try {

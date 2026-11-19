@@ -96,7 +96,7 @@ export default function LandingPage() {
               Sign In
             </Link>
             <a
-              href="#download"
+              href="/api/download/android"
               className="text-sm font-semibold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 px-5 py-2.5 rounded-xl shadow-md shadow-blue-200 hover:shadow-lg transition-all"
               id="nav-download"
             >
@@ -136,12 +136,12 @@ export default function LandingPage() {
 
             <div className="flex flex-col sm:flex-row items-start gap-4">
               <a
-                href="#download"
+                href="/api/download/android"
                 className="inline-flex items-center gap-2.5 text-base font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 px-8 py-4 rounded-2xl shadow-lg shadow-blue-200 hover:shadow-xl transition-all hover:-translate-y-0.5"
                 id="hero-download"
               >
                 <Smartphone className="h-5 w-5" />
-                Download the App
+                Download Android APK
               </a>
               <Link
                 href="/login"
@@ -292,14 +292,14 @@ export default function LandingPage() {
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <a
-                  href="#"
+                  href="/api/download/android"
                   className="inline-flex items-center gap-3 bg-white text-slate-900 font-bold px-8 py-4 rounded-2xl hover:bg-blue-50 transition-colors shadow-lg"
                   id="download-android"
                 >
                   <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor">
                     <path d="M17.523 2.625a.75.75 0 00-1.048.177L14.8 5.32a8.25 8.25 0 00-5.6 0L7.525 2.802a.75.75 0 10-1.225.866L7.9 5.88A8.25 8.25 0 004.5 12.75v.75h15v-.75a8.25 8.25 0 00-3.4-6.87l1.6-2.212a.75.75 0 00-.177-1.048zM9 10.5a.75.75 0 110-1.5.75.75 0 010 1.5zm6 0a.75.75 0 110-1.5.75.75 0 010 1.5zM4.5 14.25v5.25a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25v-5.25h-15z"/>
                   </svg>
-                  Get it on Google Play
+                  Download Android APK
                 </a>
                 <a
                   href="#"

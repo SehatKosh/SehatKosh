@@ -45,7 +45,7 @@ const AnimatedView = Animated.View as any;
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const { patient, telemetry } = usePatient();
+  const { patient, telemetry, sevenDayBaseline } = usePatient();
   const { initialQuery } = useLocalSearchParams<{ initialQuery?: string }>();
 
   const listRef = useRef<FlatList>(null);
@@ -296,6 +296,12 @@ export default function ChatScreen() {
           bloodPressure: telemetry.bloodPressure,
           sleepDuration: telemetry.sleepDuration,
           glucoseMgDl: telemetry.glucoseMgDl,
+          sevenDayBaseline: {
+            avgSteps: sevenDayBaseline.avgSteps,
+            avgRestingHr: sevenDayBaseline.avgRestingHr,
+            avgSpo2: sevenDayBaseline.avgSpo2,
+            avgSleepHours: sevenDayBaseline.avgSleepHours,
+          },
         },
       });
 

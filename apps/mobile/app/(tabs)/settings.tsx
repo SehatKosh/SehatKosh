@@ -267,10 +267,9 @@ function ConsentCard({
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark, toggleTheme } = useTheme();
-  const { patient } = usePatient();
+  const { patient, isHealthConnected, connectHealth, disconnectHealth } = usePatient();
 
   const [biometricsEnabled, setBiometricsEnabled] = useState(false);
-  const [healthConnected, setHealthConnected] = useState(true);
 
   const [consents, setConsents] = useState<ConsentEntry[]>([
     {
@@ -457,13 +456,19 @@ export default function SettingsScreen() {
           <SettingRow
             icon={<Activity size={19} color="#10B981" />}
             title="Apple Health / Health Connect"
-            detail="Connected"
+            detail={isHealthConnected ? "Connected" : "Not Connected"}
             control={
               <Switch
-                value={healthConnected}
-                onValueChange={setHealthConnected}
+                value={isHealthConnected}
+                onValueChange={async (val) => {
+                  if (val) {
+                    await connectHealth();
+                  } else {
+                    await disconnectHealth();
+                  }
+                }}
                 trackColor={{ false: "#64748B", true: "#86EFAC" }}
-                thumbColor="#10B981"
+                thumbColor={isHealthConnected ? "#10B981" : "#F1F5F9"}
               />
             }
           />

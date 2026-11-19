@@ -281,8 +281,9 @@ export class AviClientError extends Error {
  * Extracts delta text from an SSE line formatted like:
  * data: {"id":"...","choices":[{"delta":{"content":"..."}}]}
  * or data: [DONE]
+ * or data: {"error": {"message": "..."}}
  */
-function parseSseLine(line: string): { done: boolean; content?: string } {
+function parseSseLine(line: string): { done: boolean; content?: string; error?: string } {
   const trimmed = line.trim();
   if (!trimmed || !trimmed.startsWith("data:")) {
     return { done: false };
@@ -295,6 +296,11 @@ function parseSseLine(line: string): { done: boolean; content?: string } {
 
   try {
     const parsed = JSON.parse(payload);
+    // Explicit model error inside SSE stream
+    if (parsed?.error) {
+      const errMessage = parsed.error.message || "Model generation failed";
+      return { done: true, error: errMessage };
+    }
     // Standard OpenAI delta format
     const deltaContent = parsed?.choices?.[0]?.delta?.content;
     if (typeof deltaContent === "string") {
@@ -362,7 +368,11 @@ function streamViaXhr(
       streamBuffer = lines.pop() || "";
 
       for (const line of lines) {
-        const { done, content } = parseSseLine(line);
+        const { done, content, error } = parseSseLine(line);
+        if (error) {
+          reject(new AviClientError(error, 500, "MODEL_ERROR"));
+          return;
+        }
         if (done) {
           resolve(accumulatedText);
           return;
@@ -382,7 +392,11 @@ function streamViaXhr(
       if (xhr.status >= 200 && xhr.status < 300) {
         // Flush remaining buffer
         if (streamBuffer.length > 0) {
-          const { content } = parseSseLine(streamBuffer);
+          const { content, error } = parseSseLine(streamBuffer);
+          if (error) {
+            reject(new AviClientError(error, 500, "MODEL_ERROR"));
+            return;
+          }
           if (content) {
             accumulatedText += content;
             options.onDelta(content);
@@ -411,6 +425,9 @@ function streamViaXhr(
     };
 
     xhr.onerror = () => {
+      console.warn(
+        `[AviClient] XHR connection failed to ${endpoint}. Status: ${xhr.status}, ReadyState: ${xhr.readyState}`
+      );
       reject(
         new AviClientError(
           `Network connection failed to ${endpoint}. Check if lab PC is online and phone Wi-Fi/Tailscale is connected.`,
@@ -449,6 +466,8 @@ export async function streamAviChat(options: StreamAviChatOptions): Promise<stri
   const formData = new FormData();
   formData.append("prompt", options.prompt);
   formData.append("stream", "true");
+  formData.append("temperature", "0.7");
+  formData.append("max_tokens", "512");
 
   if (options.image) {
     const filePayload = {

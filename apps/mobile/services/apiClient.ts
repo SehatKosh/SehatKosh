@@ -45,7 +45,11 @@ export interface CreateEncounterPayload {
   physician_name: string;
   facility_name: string;
   encounter_date: string; // YYYY-MM-DD
+  source_type?: string;
+  verification_status?: string;
+  encounter_class?: string;
   soap_notes?: Record<string, unknown> | null;
+  vitals_snapshot?: Record<string, unknown> | null;
   fhir_bundle: FHIRBundle | Record<string, unknown>;
   document_s3_key?: string | null;
 }

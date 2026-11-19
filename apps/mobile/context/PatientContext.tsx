@@ -2,10 +2,15 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { AppState, AppStateStatus } from "react-native";
 import {
   BASELINE_TELEMETRY,
+  computeSevenDayBaseline,
+  DailyTelemetrySummary,
   fetchLiveTelemetry,
+  getDailyTelemetryRollup,
   getHealthConnectedStatus,
   requestHealthPermissions,
   setHealthConnectedStatus,
+  SevenDayBaseline,
+  syncDailySummaryToEmr,
   UnifiedTelemetrySnapshot,
 } from "../services/telemetryService";
 
@@ -48,6 +53,8 @@ export interface PatientTelemetry {
 export interface PatientContextType {
   patient: PatientRecord;
   telemetry: PatientTelemetry;
+  sevenDayBaseline: SevenDayBaseline;
+  dailyRollup: DailyTelemetrySummary[];
   isHealthConnected: boolean;
   isSyncing: boolean;
   updateTelemetry: (partial: Partial<PatientTelemetry>) => void;
@@ -103,9 +110,20 @@ export const UNIFIED_TELEMETRY: PatientTelemetry = {
   dataSource: "fallback",
 };
 
+export const DEFAULT_7D_BASELINE: SevenDayBaseline = {
+  avgSteps: 6850,
+  avgRestingHr: 71,
+  avgSpo2: 98,
+  avgSleepHours: 7.4,
+  avgDistanceKm: 5.1,
+  daysRecorded: 7,
+};
+
 const PatientContext = createContext<PatientContextType>({
   patient: UNIFIED_PATIENT,
   telemetry: UNIFIED_TELEMETRY,
+  sevenDayBaseline: DEFAULT_7D_BASELINE,
+  dailyRollup: [],
   isHealthConnected: false,
   isSyncing: false,
   updateTelemetry: () => {},
@@ -117,6 +135,8 @@ const PatientContext = createContext<PatientContextType>({
 export function PatientProvider({ children }: { children: React.ReactNode }) {
   const [patient] = useState<PatientRecord>(UNIFIED_PATIENT);
   const [telemetry, setTelemetry] = useState<PatientTelemetry>(UNIFIED_TELEMETRY);
+  const [sevenDayBaseline, setSevenDayBaseline] = useState<SevenDayBaseline>(DEFAULT_7D_BASELINE);
+  const [dailyRollup, setDailyRollup] = useState<DailyTelemetrySummary[]>([]);
   const [isHealthConnected, setIsHealthConnected] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
@@ -139,6 +159,17 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
         lastSyncedAt: snap.lastSyncedAt,
         dataSource: snap.dataSource,
       }));
+
+      // Load 30-day rolling summaries & compute 7-day baseline
+      const rollup = await getDailyTelemetryRollup();
+      setDailyRollup(rollup);
+      const baseline = computeSevenDayBaseline(rollup);
+      setSevenDayBaseline(baseline);
+
+      // Throttled background sync to FastAPI EMR backend (max once per 6 hours)
+      if (rollup.length > 0) {
+        syncDailySummaryToEmr(patient.id, rollup[0]).catch(() => {});
+      }
     } catch (err) {
       console.warn("[PatientContext] Failed to sync telemetry:", err);
     } finally {
@@ -203,6 +234,8 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
       value={{
         patient,
         telemetry,
+        sevenDayBaseline,
+        dailyRollup,
         isHealthConnected,
         isSyncing,
         updateTelemetry,

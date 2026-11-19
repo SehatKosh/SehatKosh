@@ -451,11 +451,13 @@ export async function streamAviChat(options: StreamAviChatOptions): Promise<stri
   formData.append("stream", "true");
 
   if (options.image) {
-    formData.append("image", {
+    const filePayload = {
       uri: options.image.uri,
       name: options.image.name,
       type: options.image.type,
-    } as any);
+    } as any;
+    formData.append("file", filePayload);
+    formData.append("image", filePayload);
   }
 
   return streamViaXhr(completionsEndpoint, formData, options);

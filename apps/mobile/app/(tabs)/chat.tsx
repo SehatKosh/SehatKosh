@@ -251,17 +251,9 @@ export default function ChatScreen() {
         return;
       }
 
-      // Check if server is offline
+      // If background probe previously timed out, re-check in background without blocking inquiry
       if (health.status === "unreachable") {
-        Alert.alert(
-          "Avi Server Offline",
-          "Cannot reach the MedGemma GPU server. Check lab Wi-Fi or endpoint configuration.",
-          [
-            { text: "Retry Check", onPress: refreshHealth },
-            { text: "OK" },
-          ]
-        );
-        return;
+        refreshHealth();
       }
 
       // Construct User Message
@@ -317,6 +309,15 @@ export default function ChatScreen() {
           signal: controller.signal,
           onStageChange: (stage) => setStreamingStage(stage),
           onDelta: (chunk) => {
+            setHealth((prev) =>
+              prev.status === "ready"
+                ? prev
+                : {
+                    status: "ready",
+                    statusCode: 200,
+                    message: "Avi Ready (MedGemma 1.5 4B)",
+                  }
+            );
             if (!hasCreatedAssistantBubble) {
               hasCreatedAssistantBubble = true;
               setRequestStartTime(null);

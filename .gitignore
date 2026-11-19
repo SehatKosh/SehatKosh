@@ -32,5 +32,6 @@ temp_interactive_push.bat
 .vercel/
 config.bat
 
-.env
 apps/mobile/.env
+*.apk
+build/

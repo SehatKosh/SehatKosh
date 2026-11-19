@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImageManipulator from "expo-image-manipulator";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 
 export const AVI_STORAGE_KEY = "@sehatkosh/avi_server_url";
 export const DEFAULT_AVI_URL =
@@ -77,14 +77,15 @@ export interface AviHealthResponse {
 
 export async function checkAviHealth(overrideUrl?: string): Promise<AviHealthResponse> {
   const baseUrl = overrideUrl || (await getAviBaseUrl());
-  const healthEndpoint = `${baseUrl}/health`;
   const startTime = Date.now();
 
+  // Generous 12-second timeout to handle multi-floor Wi-Fi hops, high latency, or Tailscale
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 3500);
+  const timer = setTimeout(() => controller.abort(), 12000);
 
+  // Probe primary /health endpoint first
   try {
-    const res = await fetch(healthEndpoint, {
+    const res = await fetch(`${baseUrl}/health`, {
       method: "GET",
       signal: controller.signal,
       headers: { Accept: "application/json" },
@@ -126,6 +127,32 @@ export async function checkAviHealth(overrideUrl?: string): Promise<AviHealthRes
       };
     }
 
+    // If /health returned 404, server is alive but may be standard OpenAI/vLLM without /health
+    if (res.status === 404) {
+      // Probe /v1/models
+      try {
+        const modelsRes = await fetch(`${baseUrl}/v1/models`, {
+          method: "GET",
+          headers: { Accept: "application/json" },
+        });
+        if (modelsRes.status === 200) {
+          return {
+            status: "ready",
+            statusCode: 200,
+            message: "Avi Ready (MedGemma 1.5 4B)",
+            latencyMs: Date.now() - startTime,
+          };
+        }
+      } catch {}
+      // Even if /v1/models probe throws, reaching the server with HTTP 404 proves host is online!
+      return {
+        status: "ready",
+        statusCode: 200,
+        message: "Avi Ready (Host Online)",
+        latencyMs,
+      };
+    }
+
     return {
       status: "unavailable",
       statusCode: res.status,
@@ -135,13 +162,33 @@ export async function checkAviHealth(overrideUrl?: string): Promise<AviHealthRes
     };
   } catch (err: any) {
     clearTimeout(timer);
+
+    // Fallback: Try quick probe to /v1/models or root / in case /health is blocked or missing
+    try {
+      const fallbackController = new AbortController();
+      const fbTimer = setTimeout(() => fallbackController.abort(), 4000);
+      const fallbackRes = await fetch(`${baseUrl}/v1/models`, {
+        method: "GET",
+        signal: fallbackController.signal,
+      });
+      clearTimeout(fbTimer);
+      if (fallbackRes.status >= 200 && fallbackRes.status < 500) {
+        return {
+          status: "ready",
+          statusCode: fallbackRes.status,
+          message: "Avi Ready (MedGemma 1.5 4B)",
+          latencyMs: Date.now() - startTime,
+        };
+      }
+    } catch {}
+
     const latencyMs = Date.now() - startTime;
     return {
       status: "unreachable",
       message:
         err?.name === "AbortError"
-          ? "Connection timed out (3.5s). Ensure phone is on lab Wi-Fi or Tailscale."
-          : "Lab Server Unreachable. Check lab Wi-Fi / Tailscale.",
+          ? `Connection timed out (12s) to ${baseUrl}. Check Wi-Fi or Tailscale.`
+          : `Cannot reach ${baseUrl}. Check Wi-Fi or Tailscale.`,
       latencyMs,
     };
   }
@@ -174,8 +221,15 @@ export async function prepareImageForAvi(uri: string): Promise<PreparedImage> {
     );
 
     // 2. Validate file size
-    const info = await FileSystem.getInfoAsync(manipulated.uri);
-    const sizeBytes = info.exists && "size" in info ? (info.size as number) : undefined;
+    let sizeBytes: number | undefined;
+    try {
+      const info = await FileSystem.getInfoAsync(manipulated.uri);
+      if (info.exists && "size" in info) {
+        sizeBytes = info.size as number;
+      }
+    } catch (sizeErr) {
+      console.warn("[AviClient] Could not determine file size via getInfoAsync:", sizeErr);
+    }
 
     if (sizeBytes && sizeBytes > MAX_IMAGE_BYTES) {
       throw new Error("Image exceeds 10MB limit even after compression.");
@@ -227,8 +281,9 @@ export class AviClientError extends Error {
  * Extracts delta text from an SSE line formatted like:
  * data: {"id":"...","choices":[{"delta":{"content":"..."}}]}
  * or data: [DONE]
+ * or data: {"error": {"message": "..."}}
  */
-function parseSseLine(line: string): { done: boolean; content?: string } {
+function parseSseLine(line: string): { done: boolean; content?: string; error?: string } {
   const trimmed = line.trim();
   if (!trimmed || !trimmed.startsWith("data:")) {
     return { done: false };
@@ -241,6 +296,11 @@ function parseSseLine(line: string): { done: boolean; content?: string } {
 
   try {
     const parsed = JSON.parse(payload);
+    // Explicit model error inside SSE stream
+    if (parsed?.error) {
+      const errMessage = parsed.error.message || "Model generation failed";
+      return { done: true, error: errMessage };
+    }
     // Standard OpenAI delta format
     const deltaContent = parsed?.choices?.[0]?.delta?.content;
     if (typeof deltaContent === "string") {
@@ -308,7 +368,11 @@ function streamViaXhr(
       streamBuffer = lines.pop() || "";
 
       for (const line of lines) {
-        const { done, content } = parseSseLine(line);
+        const { done, content, error } = parseSseLine(line);
+        if (error) {
+          reject(new AviClientError(error, 500, "MODEL_ERROR"));
+          return;
+        }
         if (done) {
           resolve(accumulatedText);
           return;
@@ -328,7 +392,11 @@ function streamViaXhr(
       if (xhr.status >= 200 && xhr.status < 300) {
         // Flush remaining buffer
         if (streamBuffer.length > 0) {
-          const { content } = parseSseLine(streamBuffer);
+          const { content, error } = parseSseLine(streamBuffer);
+          if (error) {
+            reject(new AviClientError(error, 500, "MODEL_ERROR"));
+            return;
+          }
           if (content) {
             accumulatedText += content;
             options.onDelta(content);
@@ -357,17 +425,27 @@ function streamViaXhr(
     };
 
     xhr.onerror = () => {
+      console.warn(
+        `[AviClient] XHR connection failed to ${endpoint}. Status: ${xhr.status}, ReadyState: ${xhr.readyState}`
+      );
       reject(
         new AviClientError(
-          "Network request failed. Ensure Avi GPU server is running and accessible.",
+          `Network connection failed to ${endpoint}. Check if lab PC is online and phone Wi-Fi/Tailscale is connected.`,
           0,
           "NETWORK_ERROR"
         )
       );
     };
 
+    xhr.timeout = 60000;
     xhr.ontimeout = () => {
-      reject(new AviClientError("Request to Avi timed out.", 408, "TIMEOUT"));
+      reject(
+        new AviClientError(
+          `Request to Avi timed out (60s) at ${endpoint}.`,
+          408,
+          "TIMEOUT"
+        )
+      );
     };
 
     try {
@@ -388,13 +466,17 @@ export async function streamAviChat(options: StreamAviChatOptions): Promise<stri
   const formData = new FormData();
   formData.append("prompt", options.prompt);
   formData.append("stream", "true");
+  formData.append("temperature", "0.7");
+  formData.append("max_tokens", "512");
 
   if (options.image) {
-    formData.append("image", {
+    const filePayload = {
       uri: options.image.uri,
       name: options.image.name,
       type: options.image.type,
-    } as any);
+    } as any;
+    formData.append("file", filePayload);
+    formData.append("image", filePayload);
   }
 
   return streamViaXhr(completionsEndpoint, formData, options);

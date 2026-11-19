@@ -14,7 +14,14 @@
     "android": {
       "package": "com.sehatkosh.app",
       "usesCleartextTraffic": true,
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.ACCESS_WIFI_STATE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "ios": {
       "bundleIdentifier": "com.sehatkosh.app",
@@ -25,6 +32,7 @@
       }
     },
     "plugins": [
+      "./plugins/withCleartextTraffic",
       "expo-router",
       [
         "expo-camera",
@@ -38,6 +46,17 @@
           "photosPermission": "Allow SehatKosh to access your photos to select prescription documents."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "96f8f625-ec39-4132-8b65-0ab64df6b167"
+      }
+    },
+    "owner": "mahsan143"
   }
 }

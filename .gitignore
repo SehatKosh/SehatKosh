@@ -6,6 +6,7 @@ out/
 .expo/
 .expo-shared/
 android/
+!apps/doctor-web/app/api/download/android/
 ios/
 *.jks
 *.keystore

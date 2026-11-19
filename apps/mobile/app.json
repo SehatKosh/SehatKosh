@@ -13,6 +13,7 @@
     "newArchEnabled": true,
     "android": {
       "package": "com.sehatkosh.app",
+      "versionCode": 1,
       "usesCleartextTraffic": true,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [

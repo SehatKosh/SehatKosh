@@ -4,14 +4,17 @@ import {
   Clock,
   FileCode2,
   Fingerprint,
+  Info,
   LogOut,
   MoonStar,
+  RefreshCw,
   Shield,
   ShieldCheck,
   Sun,
   Watch,
 } from "lucide-react-native";
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StyleSheet,
@@ -22,8 +25,11 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useState } from "react";
+import Constants from "expo-constants";
 import { useTheme } from "../../context/ThemeContext";
 import { usePatient } from "../../context/PatientContext";
+import { checkForAppUpdates, type UpdateCheckResult } from "../../services/appUpdater";
+import { UpdateAvailableModal } from "../../components/UpdateAvailableModal";
 
 // ── Reusable Row Component ──────────────────────────────────────────────────
 function SettingRow({
@@ -318,6 +324,35 @@ export default function SettingsScreen() {
     );
   };
 
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+
+  const handleCheckUpdates = async () => {
+    setIsCheckingUpdate(true);
+    try {
+      const result = await checkForAppUpdates({ force: true });
+      if (result.updateAvailable) {
+        setUpdateInfo(result);
+        setShowUpdateModal(true);
+      } else if (result.error) {
+        Alert.alert("Update Check", result.error);
+      } else {
+        Alert.alert(
+          "You're Up to Date",
+          `SehatKosh v${result.currentVersion} is currently the latest version available.`
+        );
+      }
+    } catch {
+      Alert.alert(
+        "Update Check Failed",
+        "Unable to connect to the update server. Please check your network connection."
+      );
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
+
   const topPadding = Math.max(insets.top, 16) + 4;
 
   return (
@@ -522,6 +557,49 @@ export default function SettingsScreen() {
           ))
         )}
 
+        {/* ── Section: App Version & Updates ──────────────────────────── */}
+        <Text
+          style={[
+            styles.sectionHeading,
+            { color: colors.textSecondary },
+          ]}
+        >
+          App Version & Updates
+        </Text>
+        <View
+          style={[
+            styles.cardGroup,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <SettingRow
+            icon={<Info size={19} color={colors.textSecondary} />}
+            title="Installed Version"
+            detail={`v${Constants.expoConfig?.version || "1.0.0"} (Build ${Constants.expoConfig?.android?.versionCode || 1})`}
+            onPress={handleCheckUpdates}
+          />
+          <SettingRow
+            icon={
+              isCheckingUpdate ? (
+                <ActivityIndicator size="small" color="#0284C7" />
+              ) : (
+                <RefreshCw size={19} color={colors.textSecondary} />
+              )
+            }
+            title="Check for Updates"
+            detail={
+              isCheckingUpdate
+                ? "Connecting to GitHub Releases..."
+                : "Check for new releases on GitHub"
+            }
+            isLast
+            onPress={isCheckingUpdate ? undefined : handleCheckUpdates}
+          />
+        </View>
+
         {/* ── Section: Security & Privacy ──────────────────────────────── */}
         <Text
           style={[
@@ -594,6 +672,13 @@ export default function SettingsScreen() {
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Manual Update Check Modal */}
+      <UpdateAvailableModal
+        visible={showUpdateModal}
+        updateInfo={updateInfo}
+        onClose={() => setShowUpdateModal(false)}
+      />
     </View>
   );
 }

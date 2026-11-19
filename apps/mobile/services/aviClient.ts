@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImageManipulator from "expo-image-manipulator";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 
 export const AVI_STORAGE_KEY = "@sehatkosh/avi_server_url";
 export const DEFAULT_AVI_URL =
@@ -221,8 +221,15 @@ export async function prepareImageForAvi(uri: string): Promise<PreparedImage> {
     );
 
     // 2. Validate file size
-    const info = await FileSystem.getInfoAsync(manipulated.uri);
-    const sizeBytes = info.exists && "size" in info ? (info.size as number) : undefined;
+    let sizeBytes: number | undefined;
+    try {
+      const info = await FileSystem.getInfoAsync(manipulated.uri);
+      if (info.exists && "size" in info) {
+        sizeBytes = info.size as number;
+      }
+    } catch (sizeErr) {
+      console.warn("[AviClient] Could not determine file size via getInfoAsync:", sizeErr);
+    }
 
     if (sizeBytes && sizeBytes > MAX_IMAGE_BYTES) {
       throw new Error("Image exceeds 10MB limit even after compression.");

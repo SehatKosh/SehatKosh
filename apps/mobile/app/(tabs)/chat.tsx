@@ -278,7 +278,7 @@ export default function ChatScreen() {
 
       setMessages((prev) => [userMessage, ...prev]);
 
-      // Ground prompt in synchronized patient profile
+      // Ground prompt in synchronized patient profile and live telemetry
       const fullPrompt = buildGroundedPrompt(userText, true, {
         name: patient.fullName,
         age: patient.age,
@@ -289,6 +289,14 @@ export default function ChatScreen() {
         activeMedications: patient.activeMedications.map(
           (m) => `${m.name} ${m.dosage} (${m.frequency})`
         ),
+        telemetry: {
+          steps: telemetry.steps,
+          restingHr: telemetry.restingHr,
+          spo2: telemetry.spo2,
+          bloodPressure: telemetry.bloodPressure,
+          sleepDuration: telemetry.sleepDuration,
+          glucoseMgDl: telemetry.glucoseMgDl,
+        },
       });
 
       setIsStreaming(true);

@@ -6,6 +6,14 @@ export interface PatientHealthProfile {
   allergies: string[];
   chronicConditions: string[];
   activeMedications: string[];
+  telemetry?: {
+    steps?: number;
+    restingHr?: number | null;
+    spo2?: number | null;
+    bloodPressure?: string | null;
+    sleepDuration?: string | null;
+    glucoseMgDl?: number | null;
+  };
 }
 
 export const DEFAULT_PATIENT_PROFILE: PatientHealthProfile = {
@@ -77,13 +85,29 @@ export function buildGroundedPrompt(
     );
   }
 
-  const profileSummary = [
+  const profileSummaryLines = [
     `• Patient: ${profile.name || "Patient"} (${profile.age || 38}y ${profile.gender || "Female"})`,
     `• Blood Group: ${profile.bloodGroup || "Unknown"}`,
     `• Known Allergies: ${profile.allergies.join(", ") || "None recorded"}`,
     `• Active Diagnoses: ${profile.chronicConditions.join(", ") || "None recorded"}`,
     `• Current Medications: ${profile.activeMedications.join("; ") || "None recorded"}`,
-  ].join("\n");
+  ];
+
+  if (profile.telemetry) {
+    const t = profile.telemetry;
+    const vitals: string[] = [];
+    if (t.restingHr) vitals.push(`Resting HR: ${t.restingHr} BPM`);
+    if (t.spo2) vitals.push(`SpO2: ${t.spo2}%`);
+    if (t.bloodPressure) vitals.push(`BP: ${t.bloodPressure} mmHg`);
+    if (t.sleepDuration) vitals.push(`Sleep: ${t.sleepDuration}`);
+    if (t.steps) vitals.push(`Today's Steps: ${t.steps.toLocaleString()}`);
+    if (t.glucoseMgDl) vitals.push(`Blood Glucose: ${t.glucoseMgDl} mg/dL`);
+    if (vitals.length > 0) {
+      profileSummaryLines.push(`• Live Smartwatch/Vitals Telemetry: ${vitals.join(", ")}`);
+    }
+  }
+
+  const profileSummary = profileSummaryLines.join("\n");
 
   const querySection = cleanPrompt
     ? `[PATIENT QUERY]\n${cleanPrompt}`

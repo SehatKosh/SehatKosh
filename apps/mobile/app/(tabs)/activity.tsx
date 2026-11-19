@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,115 +18,123 @@ import {
   MetricDetailData,
   MetricDetailSheet,
 } from "../../components/telemetry/MetricDetailSheet";
+import { TelemetrySyncModal } from "../../components/telemetry/TelemetrySyncModal";
 
 const HORIZONTAL_PADDING = 16;
 
 export default function ActivityScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark, toggleTheme } = useTheme();
-  const { patient, telemetry } = usePatient();
+  const {
+    patient,
+    telemetry,
+    isHealthConnected,
+    isSyncing,
+    syncTelemetryNow,
+  } = usePatient();
 
   const [selectedMetric, setSelectedMetric] = useState<MetricDetailData | null>(
     null
   );
+  const [syncModalVisible, setSyncModalVisible] = useState(false);
 
   const METRIC_DETAILS: Record<string, MetricDetailData> = {
     hr: {
       id: "hr",
       label: "Heart Rate",
-      currentValue: String(telemetry.restingHr),
+      currentValue: telemetry.restingHr !== null ? String(telemetry.restingHr) : "--",
       unit: "BPM",
-      status: "Resting Optimal",
-      statusColor: "#10B981",
+      status: telemetry.restingHr !== null ? "Resting Optimal" : "No reading today",
+      statusColor: telemetry.restingHr !== null ? "#10B981" : colors.textMuted,
       minRange: "58 BPM",
       maxRange: "96 BPM",
-      sparklinePoints: [68, 72, 70, 75, 73, 71, 72],
-      recentReadings: [
-        { time: "10 mins ago", value: "72" },
-        { time: "1 hour ago", value: "74" },
-        { time: "3 hours ago", value: "70" },
-        { time: "Yesterday", value: "68" },
-      ],
+      sparklinePoints: telemetry.restingHr !== null ? [68, 72, 70, 75, 73, 71, telemetry.restingHr] : [],
+      recentReadings: telemetry.restingHr !== null
+        ? [
+            { time: "Live Synced", value: String(telemetry.restingHr) },
+            { time: "Yesterday", value: "68" },
+          ]
+        : [{ time: "Status", value: "Not measured today" }],
     },
     spo2: {
       id: "spo2",
       label: "Blood Oxygen",
-      currentValue: String(telemetry.spo2),
+      currentValue: telemetry.spo2 !== null ? String(telemetry.spo2) : "--",
       unit: "%",
-      status: "Optimal",
-      statusColor: "#10B981",
+      status: telemetry.spo2 !== null ? "Optimal Saturation" : "No reading today",
+      statusColor: telemetry.spo2 !== null ? "#10B981" : colors.textMuted,
       minRange: "96%",
       maxRange: "99%",
-      sparklinePoints: [97, 98, 98, 99, 98, 98, 98],
-      recentReadings: [
-        { time: "15 mins ago", value: "98" },
-        { time: "2 hours ago", value: "99" },
-        { time: "Yesterday", value: "98" },
-      ],
+      sparklinePoints: telemetry.spo2 !== null ? [97, 98, 98, 99, 98, 98, telemetry.spo2] : [],
+      recentReadings: telemetry.spo2 !== null
+        ? [
+            { time: "Live Synced", value: String(telemetry.spo2) },
+            { time: "Yesterday", value: "98" },
+          ]
+        : [{ time: "Status", value: "Not measured today" }],
     },
     bp: {
       id: "bp",
       label: "Blood Pressure",
-      currentValue: telemetry.bloodPressure,
+      currentValue: telemetry.bloodPressure || "--",
       unit: "mmHg",
-      status: "Controlled (Atenolol 50mg)",
-      statusColor: "#10B981",
+      status: telemetry.bloodPressure ? "Controlled (Atenolol 50mg)" : "No reading today",
+      statusColor: telemetry.bloodPressure ? "#10B981" : colors.textMuted,
       minRange: "114/72 mmHg",
       maxRange: "128/82 mmHg",
-      sparklinePoints: [116, 120, 118, 117, 119, 118],
-      recentReadings: [
-        { time: "Morning (08:30)", value: "118/76" },
-        { time: "Yesterday", value: "116/74" },
-        { time: "3 days ago", value: "120/78" },
-      ],
+      sparklinePoints: telemetry.bloodPressure ? [116, 120, 118, 117, 119, 118] : [],
+      recentReadings: telemetry.bloodPressure
+        ? [
+            { time: "Clinical Baseline", value: telemetry.bloodPressure },
+            { time: "Yesterday", value: "116/74" },
+          ]
+        : [{ time: "Status", value: "Not measured today" }],
     },
     sleep: {
       id: "sleep",
       label: "Sleep",
-      currentValue: telemetry.sleepDuration,
+      currentValue: telemetry.sleepDuration || "--",
       unit: "",
-      status: "Restorative Stage",
-      statusColor: "#818CF8",
+      status: telemetry.sleepDuration ? "Restorative Stage" : "No sleep session recorded",
+      statusColor: telemetry.sleepDuration ? "#818CF8" : colors.textMuted,
       minRange: "6h 20m",
       maxRange: "8h 10m",
-      sparklinePoints: [6.5, 7.2, 6.8, 7.5, 7.1, 7.4],
-      recentReadings: [
-        { time: "Last Night", value: "7h 24m" },
-        { time: "Tue", value: "7h 08m" },
-        { time: "Mon", value: "6h 52m" },
-      ],
+      sparklinePoints: telemetry.sleepDuration ? [6.5, 7.2, 6.8, 7.5, 7.1, 7.4] : [],
+      recentReadings: telemetry.sleepDuration
+        ? [{ time: "Last Recorded", value: telemetry.sleepDuration }]
+        : [{ time: "Status", value: "No sleep logged" }],
     },
     steps: {
       id: "steps",
       label: "Step Distance",
-      currentValue: `${telemetry.distanceKm}`,
+      currentValue: telemetry.distanceKm > 0 ? `${telemetry.distanceKm}` : "--",
       unit: "KM",
-      status: "80% of Goal",
+      status: `${Math.round((telemetry.steps / telemetry.stepGoal) * 100)}% of Daily Goal`,
       statusColor: "#38BDF8",
       minRange: "3.2 KM",
       maxRange: "6.5 KM",
-      sparklinePoints: [3.2, 4.1, 5.2, 4.4, 5.9, 4.8],
+      sparklinePoints: [3.2, 4.1, 5.2, 4.4, 5.9, telemetry.distanceKm],
       recentReadings: [
-        { time: "Today (Live)", value: "4.8" },
-        { time: "Yesterday", value: "5.9" },
-        { time: "Sunday", value: "4.1" },
+        { time: "Today (Live)", value: `${telemetry.distanceKm} KM` },
+        { time: "Yesterday", value: "5.9 KM" },
       ],
     },
     glucose: {
       id: "glucose",
       label: "Blood Glucose",
-      currentValue: String(telemetry.glucoseMgDl),
+      currentValue: telemetry.glucoseMgDl !== null ? String(telemetry.glucoseMgDl) : "--",
       unit: "mg/dL",
-      status: "Fasting Baseline",
-      statusColor: "#10B981",
+      status: telemetry.glucoseMgDl !== null ? "Fasting Baseline" : "No reading today",
+      statusColor: telemetry.glucoseMgDl !== null ? "#10B981" : colors.textMuted,
       minRange: "85 mg/dL",
       maxRange: "105 mg/dL",
-      sparklinePoints: [96, 92, 98, 95, 94],
-      recentReadings: [
-        { time: "Fasting (07:45)", value: "94" },
-        { time: "Post-prandial", value: "118" },
-        { time: "Yesterday", value: "92" },
-      ],
+      sparklinePoints: telemetry.glucoseMgDl !== null ? [96, 92, 98, 95, telemetry.glucoseMgDl] : [],
+      recentReadings: telemetry.glucoseMgDl !== null
+        ? [
+            { time: "Clinical Baseline", value: `${telemetry.glucoseMgDl}` },
+            { time: "Yesterday", value: "92" },
+          ]
+        : [{ time: "Status", value: "Not measured today" }],
     },
   };
 
@@ -137,6 +146,18 @@ export default function ActivityScreen() {
 
   const topPadding = Math.max(insets.top, 16);
 
+  const syncPillText = isSyncing
+    ? "Syncing..."
+    : isHealthConnected
+    ? "Health Connect"
+    : "Connect Watch";
+
+  const syncPillColor = isSyncing
+    ? "#38BDF8"
+    : isHealthConnected
+    ? "#10B981"
+    : "#F59E0B";
+
   return (
     <View style={[styles.rootContainer, { backgroundColor: colors.canvas }]}>
       <ScrollView
@@ -146,6 +167,14 @@ export default function ActivityScreen() {
           { paddingTop: topPadding, paddingBottom: 120 },
         ]}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isSyncing}
+            onRefresh={syncTelemetryNow}
+            tintColor={colors.tabBarActive}
+            colors={[colors.tabBarActive]}
+          />
+        }
       >
         {/* ── Top Header: Patient Greeting, Sync Pill, Theme Switcher ──────── */}
         <View style={styles.headerRow}>
@@ -169,29 +198,31 @@ export default function ActivityScreen() {
           </View>
 
           <View style={styles.headerRightRow}>
-            {/* Sync Pill */}
-            <View
+            {/* Interactive Telemetry Sync Pill */}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setSyncModalVisible(true)}
               style={[
                 styles.syncPill,
                 {
                   backgroundColor: colors.surface,
-                  borderColor: colors.border,
+                  borderColor: isDark ? "rgba(255, 255, 255, 0.12)" : "#CBD5E1",
                 },
               ]}
             >
-              <View style={styles.liveDot} />
-              <Watch size={13} color="#10B981" />
+              <View style={[styles.liveDot, { backgroundColor: syncPillColor }]} />
+              <Watch size={13} color={syncPillColor} />
               <Text
                 style={[
                   styles.syncText,
                   { color: colors.textSecondary },
                 ]}
               >
-                Synced
+                {syncPillText}
               </Text>
-            </View>
+            </TouchableOpacity>
 
-            {/* Strict Theme Toggle (Location 1 of 2) */}
+            {/* Strict Theme Toggle */}
             <TouchableOpacity
               accessibilityLabel="Toggle Theme"
               onPress={toggleTheme}
@@ -200,7 +231,7 @@ export default function ActivityScreen() {
                 styles.themeBtn,
                 {
                   backgroundColor: colors.surface,
-                  borderColor: colors.border,
+                  borderColor: isDark ? "rgba(255, 255, 255, 0.12)" : "#CBD5E1",
                 },
               ]}
             >
@@ -221,33 +252,33 @@ export default function ActivityScreen() {
           kcalGoal={telemetry.kcalGoal}
         />
 
-        {/* ── Section 2: Interactive 2-Column Bento Metric Grid ────────────── */}
+        {/* ── Section 2: Spacious 2-Column Apple Health Bento Metric Grid ─── */}
         <View style={styles.bentoGrid}>
           {/* Row 1: Resting HR & Blood Oxygen */}
           <View style={styles.bentoRow}>
-            <View style={styles.cardColLeft}>
+            <View style={styles.cardCol}>
               <BentoMetricCard
                 id="hr"
-                label="Resting HR"
+                label="Heart Rate"
                 sublabel="Today"
-                value={String(telemetry.restingHr)}
+                value={telemetry.restingHr !== null ? String(telemetry.restingHr) : "--"}
                 unit="BPM"
                 accentColor="#FA114F"
                 valueColor="#FA114F"
-                bars={[18, 15, 12, 10, 10, 15, 30, 50, 72, 68, 75, 72, 80, 76, 74, 82]}
+                bars={[30, 45, 65, 72, 75, 71, 74, 72]}
                 onPress={handleCardPress}
               />
             </View>
-            <View style={styles.cardColRight}>
+            <View style={styles.cardCol}>
               <BentoMetricCard
                 id="spo2"
                 label="Blood Oxygen"
                 sublabel="Today"
-                value={String(telemetry.spo2)}
+                value={telemetry.spo2 !== null ? String(telemetry.spo2) : "--"}
                 unit="%"
-                accentColor="#38BDF8"
-                valueColor="#38BDF8"
-                bars={[88, 90, 89, 90, 92, 95, 98, 98, 97, 98, 98, 99, 98, 98, 98, 99]}
+                accentColor="#0284C7"
+                valueColor="#0284C7"
+                bars={[92, 95, 98, 98, 97, 98, 99, 98]}
                 onPress={handleCardPress}
               />
             </View>
@@ -255,28 +286,28 @@ export default function ActivityScreen() {
 
           {/* Row 2: Blood Pressure & Sleep */}
           <View style={styles.bentoRow}>
-            <View style={styles.cardColLeft}>
+            <View style={styles.cardCol}>
               <BentoMetricCard
                 id="bp"
                 label="Blood Pressure"
                 sublabel="Today"
-                value={telemetry.bloodPressure}
+                value={telemetry.bloodPressure || "--"}
                 unit="mmHg"
                 accentColor="#F59E0B"
                 valueColor="#F59E0B"
-                bars={[30, 28, 25, 22, 20, 24, 45, 65, 75, 70, 78, 72, 80, 76, 72, 75]}
+                bars={[45, 65, 75, 70, 78, 72, 80, 75]}
                 onPress={handleCardPress}
               />
             </View>
-            <View style={styles.cardColRight}>
+            <View style={styles.cardCol}>
               <BentoMetricCard
                 id="sleep"
                 label="Sleep"
                 sublabel="Today"
-                value={telemetry.sleepDuration}
+                value={telemetry.sleepDuration || "--"}
                 accentColor="#818CF8"
                 valueColor="#818CF8"
-                bars={[95, 95, 90, 85, 92, 88, 70, 30, 10, 5, 0, 0, 0, 0, 15, 60]}
+                bars={[90, 85, 92, 70, 30, 10, 0, 15]}
                 onPress={handleCardPress}
               />
             </View>
@@ -284,29 +315,29 @@ export default function ActivityScreen() {
 
           {/* Row 3: Step Distance & Blood Glucose */}
           <View style={styles.bentoRow}>
-            <View style={styles.cardColLeft}>
+            <View style={styles.cardCol}>
               <BentoMetricCard
                 id="steps"
                 label="Step Distance"
                 sublabel="Today"
-                value={`${telemetry.distanceKm}`}
+                value={telemetry.distanceKm > 0 ? `${telemetry.distanceKm}` : "--"}
                 unit="KM"
-                accentColor="#0284C7"
-                valueColor="#0284C7"
-                bars={[0, 0, 0, 5, 20, 45, 60, 55, 75, 80, 85, 70, 65, 90, 85, 60]}
+                accentColor="#38BDF8"
+                valueColor="#38BDF8"
+                bars={[20, 45, 60, 55, 75, 80, 85, 60]}
                 onPress={handleCardPress}
               />
             </View>
-            <View style={styles.cardColRight}>
+            <View style={styles.cardCol}>
               <BentoMetricCard
                 id="glucose"
                 label="Blood Glucose"
                 sublabel="Today"
-                value={String(telemetry.glucoseMgDl)}
+                value={telemetry.glucoseMgDl !== null ? String(telemetry.glucoseMgDl) : "--"}
                 unit="mg/dL"
                 accentColor="#10B981"
                 valueColor="#10B981"
-                bars={[40, 38, 35, 32, 30, 35, 55, 75, 65, 58, 70, 85, 72, 60, 55, 68]}
+                bars={[35, 55, 75, 65, 70, 85, 72, 60]}
                 onPress={handleCardPress}
               />
             </View>
@@ -314,10 +345,16 @@ export default function ActivityScreen() {
         </View>
       </ScrollView>
 
-      {/* ── Interactive Detail Bottom Sheet Modal ─────────────────────────────── */}
+      {/* ── Interactive Detail Bottom Sheet Modal ── */}
       <MetricDetailSheet
         data={selectedMetric}
         onClose={() => setSelectedMetric(null)}
+      />
+
+      {/* ── Wearable Telemetry Sync Modal ── */}
+      <TelemetrySyncModal
+        visible={syncModalVisible}
+        onClose={() => setSyncModalVisible(false)}
       />
     </View>
   );
@@ -368,7 +405,6 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#10B981",
   },
   syncText: {
     fontSize: 12,
@@ -388,13 +424,9 @@ const styles = StyleSheet.create({
   bentoRow: {
     flexDirection: "row",
     alignItems: "stretch",
+    gap: 12,
   },
-  cardColLeft: {
+  cardCol: {
     flex: 1,
-    marginRight: 6,
-  },
-  cardColRight: {
-    flex: 1,
-    marginLeft: 6,
   },
 });

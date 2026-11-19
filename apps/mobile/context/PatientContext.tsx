@@ -1,4 +1,13 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { AppState, AppStateStatus } from "react-native";
+import {
+  BASELINE_TELEMETRY,
+  fetchLiveTelemetry,
+  getHealthConnectedStatus,
+  requestHealthPermissions,
+  setHealthConnectedStatus,
+  UnifiedTelemetrySnapshot,
+} from "../services/telemetryService";
 
 export interface PatientRecord {
   id: string;
@@ -25,19 +34,26 @@ export interface PatientTelemetry {
   distanceKm: number;
   activeKcal: number;
   kcalGoal: number;
-  restingHr: number;
-  spo2: number;
-  bloodPressure: string;
-  sleepDuration: string;
-  glucoseMgDl: number;
+  restingHr: number | null;
+  spo2: number | null;
+  bloodPressure: string | null;
+  sleepDuration: string | null;
+  glucoseMgDl: number | null;
   medicationsTaken: number;
   medicationsTotal: number;
+  lastSyncedAt?: string | null;
+  dataSource?: "health_connect" | "healthkit" | "simulated" | "fallback";
 }
 
 export interface PatientContextType {
   patient: PatientRecord;
   telemetry: PatientTelemetry;
+  isHealthConnected: boolean;
+  isSyncing: boolean;
   updateTelemetry: (partial: Partial<PatientTelemetry>) => void;
+  connectHealth: () => Promise<boolean>;
+  disconnectHealth: () => Promise<void>;
+  syncTelemetryNow: () => Promise<void>;
 }
 
 export const UNIFIED_PATIENT: PatientRecord = {
@@ -83,24 +99,118 @@ export const UNIFIED_TELEMETRY: PatientTelemetry = {
   glucoseMgDl: 94,
   medicationsTaken: 2,
   medicationsTotal: 2,
+  lastSyncedAt: "Just now",
+  dataSource: "fallback",
 };
 
 const PatientContext = createContext<PatientContextType>({
   patient: UNIFIED_PATIENT,
   telemetry: UNIFIED_TELEMETRY,
+  isHealthConnected: false,
+  isSyncing: false,
   updateTelemetry: () => {},
+  connectHealth: async () => false,
+  disconnectHealth: async () => {},
+  syncTelemetryNow: async () => {},
 });
 
 export function PatientProvider({ children }: { children: React.ReactNode }) {
   const [patient] = useState<PatientRecord>(UNIFIED_PATIENT);
   const [telemetry, setTelemetry] = useState<PatientTelemetry>(UNIFIED_TELEMETRY);
+  const [isHealthConnected, setIsHealthConnected] = useState<boolean>(false);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  const syncTelemetryNow = async () => {
+    setIsSyncing(true);
+    try {
+      const snap = await fetchLiveTelemetry();
+      setTelemetry((prev) => ({
+        ...prev,
+        steps: snap.steps,
+        stepGoal: snap.stepGoal,
+        distanceKm: snap.distanceKm,
+        activeKcal: snap.activeKcal,
+        kcalGoal: snap.kcalGoal,
+        restingHr: snap.restingHr,
+        spo2: snap.spo2,
+        bloodPressure: snap.bloodPressure,
+        sleepDuration: snap.sleepDuration,
+        glucoseMgDl: snap.glucoseMgDl,
+        lastSyncedAt: snap.lastSyncedAt,
+        dataSource: snap.dataSource,
+      }));
+    } catch (err) {
+      console.warn("[PatientContext] Failed to sync telemetry:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const connectHealth = async (): Promise<boolean> => {
+    setIsSyncing(true);
+    try {
+      const granted = await requestHealthPermissions();
+      setIsHealthConnected(granted);
+      if (granted) {
+        await syncTelemetryNow();
+      }
+      return granted;
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const disconnectHealth = async (): Promise<void> => {
+    await setHealthConnectedStatus(false);
+    setIsHealthConnected(false);
+  };
 
   const updateTelemetry = (partial: Partial<PatientTelemetry>) => {
     setTelemetry((prev) => ({ ...prev, ...partial }));
   };
 
+  // Initial load
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const connected = await getHealthConnectedStatus();
+      if (mounted) {
+        setIsHealthConnected(connected);
+        syncTelemetryNow();
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Foreground Auto-Sync (When returning from Samsung Health or Health Connect)
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (nextAppState === "active") {
+        syncTelemetryNow();
+      }
+    };
+
+    const sub = AppState.addEventListener("change", handleAppStateChange);
+    return () => {
+      sub.remove();
+    };
+  }, []);
+
   return (
-    <PatientContext.Provider value={{ patient, telemetry, updateTelemetry }}>
+    <PatientContext.Provider
+      value={{
+        patient,
+        telemetry,
+        isHealthConnected,
+        isSyncing,
+        updateTelemetry,
+        connectHealth,
+        disconnectHealth,
+        syncTelemetryNow,
+      }}
+    >
       {children}
     </PatientContext.Provider>
   );
@@ -109,4 +219,3 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
 export function usePatient(): PatientContextType {
   return useContext(PatientContext);
 }
-

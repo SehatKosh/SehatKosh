@@ -1,5 +1,6 @@
 import { Platform, Linking } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import { saveEncounter } from "./apiClient";
 
 export const HEALTH_CONNECTED_STORAGE_KEY = "@sehatkosh/health_connected";
@@ -175,6 +176,23 @@ export async function openHealthSettings(): Promise<void> {
     } catch {
       await Linking.openSettings();
     }
+  }
+}
+
+export async function openAppSettings(): Promise<void> {
+  try {
+    await Linking.openSettings();
+  } catch {}
+}
+
+export function isRunningInExpoGo(): boolean {
+  try {
+    return (
+      Constants.appOwnership === "expo" ||
+      Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+    );
+  } catch {
+    return false;
   }
 }
 

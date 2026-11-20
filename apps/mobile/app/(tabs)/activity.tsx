@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import {
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -146,10 +147,12 @@ export default function ActivityScreen() {
 
   const topPadding = Math.max(insets.top, 16);
 
+  const platformName = Platform.OS === "ios" ? "Apple Health" : "Health Connect";
+
   const syncPillText = isSyncing
     ? "Syncing..."
     : isHealthConnected
-    ? "Health Connect"
+    ? platformName
     : "Connect Watch";
 
   const syncPillColor = isSyncing

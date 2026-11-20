@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-export const revalidate = 300; // Cache for 5 minutes
+export const dynamic = "force-dynamic";
 
 const GITHUB_RELEASES_API =
   "https://api.github.com/repos/AHSANooo/SehatKosh-v1/releases/latest";

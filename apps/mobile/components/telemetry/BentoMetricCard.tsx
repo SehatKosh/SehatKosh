@@ -17,16 +17,14 @@ export interface BentoMetricCardProps {
   valueColor?: string;
   unitColor?: string;
   accentColor?: string;
-  bars?: number[]; // array of 0 to 100 percentage values (16 bars)
+  bars?: number[]; // array of 0 to 100 percentage values (8 bars)
   ticks?: number[]; // backward-compatible alias
-  cardWidth?: number;
   onPress: (id: string) => void;
 }
 
-// 16 baseline bar heights representing a day's telemetry rhythm
-const DEFAULT_16_BARS = [
-  20, 15, 12, 10, 15, 35, 60, 75, 85, 70, 80, 90, 75, 60, 40, 25,
-];
+// 8 spacious baseline bar heights representing a day's telemetry rhythm
+const DEFAULT_8_BARS = [25, 20, 35, 65, 80, 75, 60, 30];
+const EMPTY_8_BARS = [12, 12, 12, 12, 12, 12, 12, 12];
 
 export function BentoMetricCard({
   id,
@@ -43,35 +41,40 @@ export function BentoMetricCard({
 }: BentoMetricCardProps) {
   const { colors, isDark } = useTheme();
 
-  // Normalize bars to exactly 16 slots (accepting bars or ticks alias)
-  const sourceBars = bars ?? ticks ?? DEFAULT_16_BARS;
+  const isNoData = !value || value === "--" || value === "null";
+  const displayValue = isNoData ? "--" : value;
+  const displaySublabel = isNoData ? "No data today" : sublabel;
+
+  // Normalize bars to exactly 8 spacious slots
+  const sourceBars = bars ?? ticks ?? (isNoData ? EMPTY_8_BARS : DEFAULT_8_BARS);
   const displayBars = useMemo(() => {
-    if (!sourceBars || sourceBars.length === 0) return DEFAULT_16_BARS;
-    if (sourceBars.length === 16) return sourceBars;
-    return Array.from({ length: 16 }, (_, i) => {
-      const idx = Math.floor((i / 16) * sourceBars.length);
+    if (isNoData) return EMPTY_8_BARS;
+    if (!sourceBars || sourceBars.length === 0) return DEFAULT_8_BARS;
+    if (sourceBars.length === 8) return sourceBars;
+    return Array.from({ length: 8 }, (_, i) => {
+      const idx = Math.floor((i / 8) * sourceBars.length);
       return sourceBars[idx] ?? 20;
     });
-  }, [sourceBars]);
+  }, [sourceBars, isNoData]);
 
-  // Convert hex accent color to 14% translucent track color
+  // Translucent track color
   const trackBgColor = useMemo(() => {
-    return isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.06)";
+    return isDark ? "rgba(255, 255, 255, 0.08)" : "rgba(0, 0, 0, 0.05)";
   }, [isDark]);
 
   const cardBorderColor = isDark
-    ? "rgba(255, 255, 255, 0.12)"
-    : "#CBD5E1";
+    ? "rgba(255, 255, 255, 0.10)"
+    : "rgba(0, 0, 0, 0.08)";
 
   const chevronBg = isDark
     ? "rgba(255, 255, 255, 0.08)"
-    : "#F1F5F9";
+    : "rgba(0, 0, 0, 0.04)";
 
   return (
     <TouchableOpacity
       activeOpacity={0.75}
       accessibilityRole="button"
-      accessibilityLabel={`${label}: ${value} ${unit || ""}`}
+      accessibilityLabel={`${label}: ${displayValue} ${unit || ""}`}
       onPress={() => onPress(id)}
       style={[
         styles.cardContainer,
@@ -81,7 +84,7 @@ export function BentoMetricCard({
         },
       ]}
     >
-      {/* ── Row 1 (Header): Full Untruncated Title + 24x24 Circular Chevron ── */}
+      {/* ── Row 1: Title + Subtle Circular Chevron ── */}
       <View style={styles.headerRow}>
         <Text
           style={[
@@ -95,35 +98,40 @@ export function BentoMetricCard({
         </Text>
         <View style={[styles.chevronCircle, { backgroundColor: chevronBg }]}>
           <ChevronRight
-            size={12}
+            size={11}
             color={colors.textSecondary}
             strokeWidth={2.4}
           />
         </View>
       </View>
 
-      {/* ── Row 2 (Timestamp): Today ─────────────────────────────────────── */}
+      {/* ── Row 2: Subtitle (Today / No data today) ── */}
       <Text
         style={[
           styles.timestampText,
-          { color: colors.textSecondary },
+          { color: isNoData ? colors.textMuted : colors.textSecondary },
         ]}
+        numberOfLines={1}
       >
-        {sublabel}
+        {displaySublabel}
       </Text>
 
-      {/* ── Row 3 (Oversized Value): 28px Bold + Colored Unit ────────────── */}
+      {/* ── Row 3: Bold Metric Value + Colored Unit ── */}
       <View style={styles.valueRow}>
         <Text
           style={[
             styles.valueText,
-            { color: valueColor || colors.textPrimary },
+            {
+              color: isNoData
+                ? colors.textMuted
+                : valueColor || colors.textPrimary,
+            },
           ]}
           numberOfLines={1}
         >
-          {value}
+          {displayValue}
         </Text>
-        {unit ? (
+        {unit && !isNoData ? (
           <Text
             style={[
               styles.unitText,
@@ -135,11 +143,11 @@ export function BentoMetricCard({
         ) : null}
       </View>
 
-      {/* ── Row 4: 16 Narrow Vertical Bars (width: 3.5, height: 38) ──────── */}
+      {/* ── Row 4: 8 Spacious Apple-Style Vertical Bars ── */}
       <View style={styles.barsContainer}>
         <View style={styles.barsRow}>
           {displayBars.map((heightPercent, index) => {
-            const clamped = Math.max(10, Math.min(100, heightPercent));
+            const clamped = isNoData ? 8 : Math.max(12, Math.min(100, heightPercent));
             return (
               <View
                 key={index}
@@ -153,7 +161,7 @@ export function BentoMetricCard({
                     styles.barFill,
                     {
                       height: `${clamped}%`,
-                      backgroundColor: accentColor,
+                      backgroundColor: isNoData ? trackBgColor : accentColor,
                     },
                   ]}
                 />
@@ -162,15 +170,12 @@ export function BentoMetricCard({
           })}
         </View>
 
-        {/* ONLY 3 Spaced Time Indicators: 12 AM, 12 PM, 6 PM */}
+        {/* 2 Clean Spaced Time Indicators: 12 AM, 6 PM */}
         <View style={styles.timeIndicatorsRow}>
-          <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>
+          <Text style={[styles.timeLabel, { color: colors.textMuted }]}>
             12 AM
           </Text>
-          <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>
-            12 PM
-          </Text>
-          <Text style={[styles.timeLabel, { color: colors.textSecondary }]}>
+          <Text style={[styles.timeLabel, { color: colors.textMuted }]}>
             6 PM
           </Text>
         </View>
@@ -182,16 +187,15 @@ export function BentoMetricCard({
 const styles = StyleSheet.create({
   cardContainer: {
     width: "100%",
-    borderRadius: 22,
-    borderWidth: 1.5,
-    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 14,
     justifyContent: "space-between",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
-    overflow: "hidden",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
   },
   headerRow: {
     flexDirection: "row",
@@ -199,21 +203,21 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   titleText: {
-    fontSize: 14.5,
+    fontSize: 13.5,
     fontWeight: "600",
     letterSpacing: -0.2,
     flex: 1,
-    marginRight: 6,
+    marginRight: 4,
   },
   chevronCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
   timestampText: {
-    fontSize: 12.5,
+    fontSize: 11.5,
     fontWeight: "500",
     marginTop: 2,
   },
@@ -221,16 +225,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "baseline",
     gap: 4,
-    marginVertical: 10,
+    marginVertical: 8,
   },
   valueText: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "700",
     fontVariant: ["tabular-nums"],
     letterSpacing: -0.5,
   },
   unitText: {
-    fontSize: 14,
+    fontSize: 12.5,
     fontWeight: "700",
   },
   barsContainer: {
@@ -241,29 +245,30 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
-    height: 38,
+    height: 32,
     width: "100%",
+    paddingHorizontal: 2,
   },
   barTrack: {
-    width: 3.5,
-    height: 38,
-    borderRadius: 2,
+    width: 5,
+    height: 32,
+    borderRadius: 2.5,
     justifyContent: "flex-end",
     overflow: "hidden",
   },
   barFill: {
-    width: 3.5,
-    borderRadius: 2,
+    width: 5,
+    borderRadius: 2.5,
   },
   timeIndicatorsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     width: "100%",
-    marginTop: 6,
+    marginTop: 4,
+    paddingHorizontal: 2,
   },
   timeLabel: {
-    fontSize: 10,
-    fontWeight: "600",
-    letterSpacing: 0.1,
+    fontSize: 9.5,
+    fontWeight: "500",
   },
 });

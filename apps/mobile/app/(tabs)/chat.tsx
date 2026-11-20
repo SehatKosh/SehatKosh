@@ -45,7 +45,7 @@ const AnimatedView = Animated.View as any;
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const { colors, isDark } = useTheme();
-  const { patient, telemetry } = usePatient();
+  const { patient, telemetry, sevenDayBaseline } = usePatient();
   const { initialQuery } = useLocalSearchParams<{ initialQuery?: string }>();
 
   const listRef = useRef<FlatList>(null);
@@ -278,7 +278,7 @@ export default function ChatScreen() {
 
       setMessages((prev) => [userMessage, ...prev]);
 
-      // Ground prompt in synchronized patient profile
+      // Ground prompt in synchronized patient profile and live telemetry
       const fullPrompt = buildGroundedPrompt(userText, true, {
         name: patient.fullName,
         age: patient.age,
@@ -289,6 +289,20 @@ export default function ChatScreen() {
         activeMedications: patient.activeMedications.map(
           (m) => `${m.name} ${m.dosage} (${m.frequency})`
         ),
+        telemetry: {
+          steps: telemetry.steps,
+          restingHr: telemetry.restingHr,
+          spo2: telemetry.spo2,
+          bloodPressure: telemetry.bloodPressure,
+          sleepDuration: telemetry.sleepDuration,
+          glucoseMgDl: telemetry.glucoseMgDl,
+          sevenDayBaseline: {
+            avgSteps: sevenDayBaseline.avgSteps,
+            avgRestingHr: sevenDayBaseline.avgRestingHr,
+            avgSpo2: sevenDayBaseline.avgSpo2,
+            avgSleepHours: sevenDayBaseline.avgSleepHours,
+          },
+        },
       });
 
       setIsStreaming(true);

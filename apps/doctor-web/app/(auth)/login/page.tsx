@@ -220,6 +220,17 @@ export default function LoginPage() {
           )}
         </div>
       </div>
+
+      {/* Patient App Download Prompt */}
+      <div className="mt-6 text-center text-sm text-muted-foreground">
+        Are you a patient?{" "}
+        <a
+          href="/api/download/android"
+          className="font-semibold text-blue-600 hover:text-blue-700 underline underline-offset-4"
+        >
+          Download the Android App (APK)
+        </a>
+      </div>
     </div>
   );
 }

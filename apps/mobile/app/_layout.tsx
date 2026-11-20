@@ -19,13 +19,41 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { GlobalOverlays } from "../components/GlobalOverlays";
+import { useEffect, useState } from "react";
 import { ThemeProvider, useAppTheme } from "../constants/themeContext";
 import { PatientProvider } from "../context/PatientContext";
+import { migrateLocalStorage } from "../services/storageMigrator";
+import { checkForAppUpdates, type UpdateCheckResult } from "../services/appUpdater";
+import { UpdateAvailableModal } from "../components/UpdateAvailableModal";
 
 const queryClient = new QueryClient();
 
 function RootContent() {
   const { isDark, theme } = useAppTheme();
+  const [updateInfo, setUpdateInfo] = useState<UpdateCheckResult | null>(null);
+  const [updateModalVisible, setUpdateModalVisible] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    async function initApp() {
+      // 1. Run local storage schema migrations on boot
+      await migrateLocalStorage();
+
+      // 2. Check for app updates (24-hour throttled in background)
+      const update = await checkForAppUpdates({ force: false });
+      if (mounted && update.updateAvailable) {
+        setUpdateInfo(update);
+        setUpdateModalVisible(true);
+      }
+    }
+
+    initApp();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <>
       <StatusBar style={isDark ? "light" : "dark"} />
@@ -73,6 +101,13 @@ function RootContent() {
           />
         </Stack>
       </GlobalOverlays>
+
+      {/* GitHub Releases In-App Update Modal */}
+      <UpdateAvailableModal
+        visible={updateModalVisible}
+        updateInfo={updateInfo}
+        onClose={() => setUpdateModalVisible(false)}
+      />
     </>
   );
 }

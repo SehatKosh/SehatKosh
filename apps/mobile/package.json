@@ -6,7 +6,8 @@
     "dev": "node init && expo start",
     "dev:tunnel": "node init && expo start --tunnel",
     "android": "expo run:android",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "postinstall": "node ../../scripts/patch-expo-cmd.js"
   },
   "dependencies": {
     "@expo/dom-webview": "~58.0.2",
@@ -34,6 +35,7 @@
     "react": "19.3.0",
     "react-native": "0.88.1",
     "react-native-gesture-handler": "~3.3.0",
+    "react-native-health-connect": "^4.1.3",
     "react-native-reanimated": "4.7.1",
     "react-native-safe-area-context": "~5.11.1",
     "react-native-screens": "~4.30.1",

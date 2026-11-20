@@ -6,6 +6,20 @@ export interface PatientHealthProfile {
   allergies: string[];
   chronicConditions: string[];
   activeMedications: string[];
+  telemetry?: {
+    steps?: number;
+    restingHr?: number | null;
+    spo2?: number | null;
+    bloodPressure?: string | null;
+    sleepDuration?: string | null;
+    glucoseMgDl?: number | null;
+    sevenDayBaseline?: {
+      avgSteps?: number;
+      avgRestingHr?: number | null;
+      avgSpo2?: number | null;
+      avgSleepHours?: number | null;
+    };
+  };
 }
 
 export const DEFAULT_PATIENT_PROFILE: PatientHealthProfile = {
@@ -77,13 +91,40 @@ export function buildGroundedPrompt(
     );
   }
 
-  const profileSummary = [
+  const profileSummaryLines = [
     `• Patient: ${profile.name || "Patient"} (${profile.age || 38}y ${profile.gender || "Female"})`,
     `• Blood Group: ${profile.bloodGroup || "Unknown"}`,
     `• Known Allergies: ${profile.allergies.join(", ") || "None recorded"}`,
     `• Active Diagnoses: ${profile.chronicConditions.join(", ") || "None recorded"}`,
     `• Current Medications: ${profile.activeMedications.join("; ") || "None recorded"}`,
-  ].join("\n");
+  ];
+
+  if (profile.telemetry) {
+    const t = profile.telemetry;
+    const vitals: string[] = [];
+    if (t.steps) vitals.push(`${t.steps.toLocaleString()} steps`);
+    if (t.restingHr) vitals.push(`${t.restingHr} bpm resting HR`);
+    if (t.spo2) vitals.push(`${t.spo2}% SpO2`);
+    if (t.sleepDuration) vitals.push(`${t.sleepDuration} sleep`);
+    if (t.bloodPressure) vitals.push(`${t.bloodPressure} mmHg BP`);
+    if (t.glucoseMgDl) vitals.push(`${t.glucoseMgDl} mg/dL Glucose`);
+
+    let telemetryLine = `• Wearable Telemetry — Today: ${vitals.join(", ") || "Active baseline"}`;
+    if (t.sevenDayBaseline) {
+      const b = t.sevenDayBaseline;
+      const bItems: string[] = [];
+      if (b.avgSteps) bItems.push(`${b.avgSteps.toLocaleString()} steps/day`);
+      if (b.avgRestingHr) bItems.push(`${b.avgRestingHr} bpm HR`);
+      if (b.avgSpo2) bItems.push(`${b.avgSpo2}% SpO2`);
+      if (b.avgSleepHours) bItems.push(`${b.avgSleepHours}h sleep`);
+      if (bItems.length > 0) {
+        telemetryLine += ` | 7-Day Avg: ${bItems.join(", ")}`;
+      }
+    }
+    profileSummaryLines.push(telemetryLine);
+  }
+
+  const profileSummary = profileSummaryLines.join("\n");
 
   const querySection = cleanPrompt
     ? `[PATIENT QUERY]\n${cleanPrompt}`

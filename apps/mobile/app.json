@@ -3,7 +3,7 @@
     "name": "SehatKosh",
     "slug": "sehatkosh",
     "scheme": "sehatkosh",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "userInterfaceStyle": "automatic",
     "platforms": [
       "ios",
@@ -13,6 +13,7 @@
     "newArchEnabled": true,
     "android": {
       "package": "com.sehatkosh.app",
+      "versionCode": 2,
       "usesCleartextTraffic": true,
       "softwareKeyboardLayoutMode": "resize",
       "permissions": [
@@ -20,7 +21,16 @@
         "android.permission.ACCESS_NETWORK_STATE",
         "android.permission.ACCESS_WIFI_STATE",
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_HEART_RATE",
+        "android.permission.health.READ_OXYGEN_SATURATION",
+        "android.permission.health.READ_DISTANCE",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+        "android.permission.health.READ_SLEEP",
+        "android.permission.health.READ_BLOOD_PRESSURE",
+        "android.permission.health.READ_BLOOD_GLUCOSE"
       ]
     },
     "ios": {
@@ -28,11 +38,15 @@
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true
-        }
+        },
+        "NSHealthShareUsageDescription": "SehatKosh reads your daily steps, heart rate, blood oxygen, and sleep to display real-time activity trends and ground clinical AI consultations.",
+        "NSHealthUpdateUsageDescription": "SehatKosh synchronizes health telemetry with Apple Health."
       }
     },
     "plugins": [
       "./plugins/withCleartextTraffic",
+      "./plugins/withHealthConnect",
+      "react-native-health-connect",
       "expo-router",
       [
         "expo-camera",

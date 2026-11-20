@@ -6,6 +6,7 @@ function withHealthConnect(config) {
 
     // 1. Health Connect Permissions
     const healthPermissions = [
+      "android.permission.ACTIVITY_RECOGNITION",
       "android.permission.health.READ_STEPS",
       "android.permission.health.READ_HEART_RATE",
       "android.permission.health.READ_OXYGEN_SATURATION",
@@ -52,7 +53,30 @@ function withHealthConnect(config) {
       });
     }
 
-    // 3. Permission rationale intent filter on MainActivity
+    if (!queriesObj.intent) {
+      queriesObj.intent = [];
+    }
+    const hasRationaleQuery = queriesObj.intent.some((item) =>
+      item.action?.some(
+        (act) =>
+          act.$?.["android:name"] ===
+          "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE"
+      )
+    );
+    if (!hasRationaleQuery) {
+      queriesObj.intent.push({
+        action: [
+          {
+            $: {
+              "android:name":
+                "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE",
+            },
+          },
+        ],
+      });
+    }
+
+    // 3. Permission rationale intent filter on MainActivity (Legacy <= Android 13)
     const application = androidManifest.application?.[0];
     const mainActivity = application?.activity?.find(
       (a) => a.$?.["android:name"] === ".MainActivity"
@@ -77,6 +101,44 @@ function withHealthConnect(config) {
                 "android:name":
                   "androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE",
               },
+            },
+          ],
+        });
+      }
+    }
+
+    // 4. Mandatory Android 14/15/16 Activity-Alias
+    if (application) {
+      if (!application["activity-alias"]) {
+        application["activity-alias"] = [];
+      }
+      const hasAlias = application["activity-alias"].some(
+        (alias) => alias.$?.["android:name"] === "ViewPermissionUsageActivity"
+      );
+      if (!hasAlias) {
+        application["activity-alias"].push({
+          $: {
+            "android:name": "ViewPermissionUsageActivity",
+            "android:exported": "true",
+            "android:targetActivity": ".MainActivity",
+            "android:permission": "android.permission.START_VIEW_PERMISSION_USAGE",
+          },
+          "intent-filter": [
+            {
+              action: [
+                {
+                  $: {
+                    "android:name": "android.intent.action.VIEW_PERMISSION_USAGE",
+                  },
+                },
+              ],
+              category: [
+                {
+                  $: {
+                    "android:name": "android.intent.category.HEALTH_PERMISSIONS",
+                  },
+                },
+              ],
             },
           ],
         });

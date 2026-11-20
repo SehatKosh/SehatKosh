@@ -12,7 +12,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 export const GITHUB_RELEASES_API =
   "https://api.github.com/repos/AHSANooo/SehatKosh-v1/releases/latest";
 export const FALLBACK_LATEST_APK_URL =
-  "https://github.com/AHSANooo/SehatKosh-v1/releases/latest/download/SehatKosh-latest.apk";
+  "https://github.com/AHSANooo/SehatKosh-v1/releases/latest";
 
 const LAST_CHECK_TS_STORAGE_KEY = "@sehatkosh/last_update_check_ts";
 const THROTTLE_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours

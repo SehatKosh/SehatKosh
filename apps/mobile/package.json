@@ -6,7 +6,8 @@
     "dev": "node init && expo start",
     "dev:tunnel": "node init && expo start --tunnel",
     "android": "expo run:android",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "postinstall": "node ../../scripts/patch-expo-cmd.js"
   },
   "dependencies": {
     "@expo/dom-webview": "~58.0.2",

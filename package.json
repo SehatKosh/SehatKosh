@@ -15,7 +15,8 @@
     "lint": "turbo run lint",
     "test:backend": "node -e \"const py = process.platform === 'win32' ? 'services\\\\backend\\\\.venv\\\\Scripts\\\\python.exe' : 'services/backend/.venv/bin/python'; require('child_process').execSync(`${py} -m pytest -v`, {cwd: 'services/backend', stdio: 'inherit'})\"",
     "test": "pnpm test:backend",
-    "clean": "turbo run clean"
+    "clean": "turbo run clean",
+    "postinstall": "node scripts/patch-expo-cmd.js"
   },
   "devDependencies": {
     "prettier": "^3.3.0",

@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, { Circle, G, Path } from "react-native-svg";
 import { useTheme } from "../../context/ThemeContext";
 
 interface SingleRingProps {
   steps?: number;
+  stepGoal?: number;
   distanceKm?: number;
-  activeKcal?: number;
+  activeKcal?: number | null;
   kcalGoal?: number;
 }
 
@@ -18,40 +19,50 @@ const RING_CONFIG = {
 };
 
 export function AppleHealthSingleRing({
-  steps = 6420,
-  distanceKm = 4.8,
-  activeKcal = 285,
+  steps = 0,
+  stepGoal = 8000,
+  distanceKm = 0,
+  activeKcal = null,
   kcalGoal = 400,
 }: SingleRingProps) {
   const { colors, isDark } = useTheme();
 
-  // Animated sweep percentage from 0 to 1
-  const [sweep, setSweep] = useState(0);
+  // Dynamic step ratio: at least 3%-5% cap arc when connected so starting arrow is visible
+  const stepRatio = Math.min(Math.max((steps || 0) / (stepGoal || 8000), 0), 1);
+  const targetProgress = steps > 0 ? Math.max(stepRatio, 0.05) : 0.03;
 
-  const moveProgress = Math.min(activeKcal / (kcalGoal || 400), 1); // ~0.71
+  // Smoothly animated progress tracking
+  const [sweep, setSweep] = useState(targetProgress);
+  const prevSweepRef = useRef(sweep);
 
   useEffect(() => {
     let frameId: number;
-    let start: number | null = null;
-    const duration = 1000;
+    const startValue = prevSweepRef.current;
+    const endValue = targetProgress;
+    const duration = 800;
+    let startTime: number | null = null;
 
-    const step = (timestamp: number) => {
-      if (!start) start = timestamp;
-      const progress = Math.min((timestamp - start) / duration, 1);
-      // Cubic ease out
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // Cubic ease-out
       const eased = 1 - Math.pow(1 - progress, 3);
-      setSweep(eased);
+      const current = startValue + (endValue - startValue) * eased;
+      setSweep(current);
+      prevSweepRef.current = current;
+
       if (progress < 1) {
-        frameId = requestAnimationFrame(step);
+        frameId = requestAnimationFrame(animate);
       }
     };
 
-    frameId = requestAnimationFrame(step);
+    frameId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(frameId);
-  }, []);
+  }, [targetProgress]);
 
   const circumference = 2 * Math.PI * RING_CONFIG.radius;
-  const strokeOffset = circumference * (1 - moveProgress * sweep);
+  const strokeOffset = circumference * (1 - sweep);
 
   return (
     <View
@@ -99,7 +110,6 @@ export function AppleHealthSingleRing({
           </G>
 
           {/* Crisp right-pointing arrow embedded inside starting cap at 12 o'clock */}
-          {/* Center of cap at 12 o'clock is (68, 12) */}
           <Path
             d="M65.5 8.5L71.5 12L65.5 15.5"
             stroke="#000000"
@@ -113,33 +123,20 @@ export function AppleHealthSingleRing({
 
       {/* ── Right Side: Clean 3-Row Metric Stack (tabular-nums) ────────────── */}
       <View style={styles.metricsColumn}>
-        {/* Row 1: MOVE */}
-        <View style={styles.metricItem}>
-          <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
-            MOVE
-          </Text>
-          <Text style={styles.moveValue}>
-            {activeKcal}/{kcalGoal}{" "}
-            <Text style={styles.moveUnit}>KCAL</Text>
-          </Text>
-        </View>
-
-        {/* Row 2: STEPS */}
+        {/* Row 1: STEPS (Primary Crimson Pink) */}
         <View style={styles.metricItem}>
           <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
             STEPS
           </Text>
-          <Text
-            style={[
-              styles.standardValue,
-              { color: colors.textPrimary },
-            ]}
-          >
-            {steps.toLocaleString()}
+          <Text style={styles.stepsValue}>
+            {steps.toLocaleString()}{" "}
+            <Text style={styles.stepsGoalText}>
+              / {(stepGoal || 8000).toLocaleString()}
+            </Text>
           </Text>
         </View>
 
-        {/* Row 3: DISTANCE */}
+        {/* Row 2: DISTANCE */}
         <View style={styles.metricItem}>
           <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
             DISTANCE
@@ -150,8 +147,32 @@ export function AppleHealthSingleRing({
               { color: colors.textPrimary },
             ]}
           >
-            {distanceKm}{" "}
-            <Text style={styles.distanceUnit}>KM</Text>
+            {distanceKm.toFixed(2)}{" "}
+            <Text style={styles.unitText}>KM</Text>
+          </Text>
+        </View>
+
+        {/* Row 3: ACTIVE ENERGY */}
+        <View style={styles.metricItem}>
+          <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+            ACTIVE ENERGY
+          </Text>
+          <Text
+            style={[
+              styles.standardValue,
+              { color: colors.textPrimary },
+            ]}
+          >
+            {activeKcal !== null ? (
+              <>
+                {Math.round(activeKcal)}{" "}
+                <Text style={styles.unitText}>/ {kcalGoal || 400} KCAL</Text>
+              </>
+            ) : (
+              <Text style={{ color: colors.textMuted }}>
+                -- / {kcalGoal || 400} KCAL
+              </Text>
+            )}
           </Text>
         </View>
       </View>
@@ -195,25 +216,26 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: "uppercase",
   },
-  moveValue: {
+  stepsValue: {
     fontSize: 22,
     fontWeight: "800",
     color: "#FA114F",
     fontVariant: ["tabular-nums"],
     letterSpacing: -0.4,
   },
-  moveUnit: {
+  stepsGoalText: {
     fontSize: 13,
     fontWeight: "700",
+    color: "rgba(250, 17, 79, 0.75)",
   },
   standardValue: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: "800",
     fontVariant: ["tabular-nums"],
     letterSpacing: -0.4,
   },
-  distanceUnit: {
-    fontSize: 14,
+  unitText: {
+    fontSize: 13,
     fontWeight: "700",
   },
 });

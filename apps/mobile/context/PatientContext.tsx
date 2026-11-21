@@ -1,14 +1,19 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useRef } from "react";
 import { AppState, AppStateStatus } from "react-native";
 import {
   BASELINE_TELEMETRY,
   computeSevenDayBaseline,
   DailyTelemetrySummary,
+  DayHistoryPoint,
   fetchLiveTelemetry,
   getDailyTelemetryRollup,
   getHealthConnectedStatus,
+  getUseDemoBaselineStatus,
+  HealthConnectDiagnostics,
+  HourlyTelemetryBreakdown,
   requestHealthPermissions,
   setHealthConnectedStatus,
+  setUseDemoBaselineStatus,
   SevenDayBaseline,
   syncDailySummaryToEmr,
   UnifiedTelemetrySnapshot,
@@ -37,7 +42,8 @@ export interface PatientTelemetry {
   steps: number;
   stepGoal: number;
   distanceKm: number;
-  activeKcal: number;
+  activeKcal: number | null;
+  activeCalories?: number | null; // Alias for activeKcal
   kcalGoal: number;
   restingHr: number | null;
   spo2: number | null;
@@ -48,6 +54,9 @@ export interface PatientTelemetry {
   medicationsTotal: number;
   lastSyncedAt?: string | null;
   dataSource?: "health_connect" | "healthkit" | "simulated" | "fallback";
+  hourlyBreakdown: HourlyTelemetryBreakdown;
+  dailyHistory: DayHistoryPoint[];
+  diagnostics?: HealthConnectDiagnostics;
 }
 
 export interface PatientContextType {
@@ -57,10 +66,13 @@ export interface PatientContextType {
   dailyRollup: DailyTelemetrySummary[];
   isHealthConnected: boolean;
   isSyncing: boolean;
+  useDemoData: boolean;
+  diagnostics: HealthConnectDiagnostics | null;
+  setUseDemoData: (enabled: boolean) => Promise<void>;
   updateTelemetry: (partial: Partial<PatientTelemetry>) => void;
   connectHealth: () => Promise<boolean>;
   disconnectHealth: () => Promise<void>;
-  syncTelemetryNow: () => Promise<void>;
+  syncTelemetryNow: (silent?: boolean) => Promise<void>;
 }
 
 export const UNIFIED_PATIENT: PatientRecord = {
@@ -94,16 +106,8 @@ export const UNIFIED_PATIENT: PatientRecord = {
 };
 
 export const UNIFIED_TELEMETRY: PatientTelemetry = {
-  steps: 6420,
-  stepGoal: 8000,
-  distanceKm: 4.8,
-  activeKcal: 285,
-  kcalGoal: 400,
-  restingHr: 72,
-  spo2: 98,
-  bloodPressure: "118/76",
-  sleepDuration: "7h 24m",
-  glucoseMgDl: 94,
+  ...BASELINE_TELEMETRY,
+  activeCalories: BASELINE_TELEMETRY.activeKcal,
   medicationsTaken: 2,
   medicationsTotal: 2,
   lastSyncedAt: "Just now",
@@ -126,6 +130,9 @@ const PatientContext = createContext<PatientContextType>({
   dailyRollup: [],
   isHealthConnected: false,
   isSyncing: false,
+  useDemoData: false,
+  diagnostics: null,
+  setUseDemoData: async () => {},
   updateTelemetry: () => {},
   connectHealth: async () => false,
   disconnectHealth: async () => {},
@@ -135,13 +142,20 @@ const PatientContext = createContext<PatientContextType>({
 export function PatientProvider({ children }: { children: React.ReactNode }) {
   const [patient] = useState<PatientRecord>(UNIFIED_PATIENT);
   const [telemetry, setTelemetry] = useState<PatientTelemetry>(UNIFIED_TELEMETRY);
-  const [sevenDayBaseline, setSevenDayBaseline] = useState<SevenDayBaseline>(DEFAULT_7D_BASELINE);
+  const [sevenDayBaseline, setSevenDayBaseline] =
+    useState<SevenDayBaseline>(DEFAULT_7D_BASELINE);
   const [dailyRollup, setDailyRollup] = useState<DailyTelemetrySummary[]>([]);
   const [isHealthConnected, setIsHealthConnected] = useState<boolean>(false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [useDemoData, setUseDemoDataState] = useState<boolean>(false);
+  const [diagnostics, setDiagnostics] =
+    useState<HealthConnectDiagnostics | null>(null);
 
-  const syncTelemetryNow = async () => {
-    setIsSyncing(true);
+  const isConnectedRef = useRef(isHealthConnected);
+  isConnectedRef.current = isHealthConnected;
+
+  const syncTelemetryNow = async (silent = false) => {
+    if (!silent) setIsSyncing(true);
     try {
       const snap = await fetchLiveTelemetry();
       setTelemetry((prev) => ({
@@ -150,6 +164,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
         stepGoal: snap.stepGoal,
         distanceKm: snap.distanceKm,
         activeKcal: snap.activeKcal,
+        activeCalories: snap.activeKcal,
         kcalGoal: snap.kcalGoal,
         restingHr: snap.restingHr,
         spo2: snap.spo2,
@@ -158,7 +173,14 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
         glucoseMgDl: snap.glucoseMgDl,
         lastSyncedAt: snap.lastSyncedAt,
         dataSource: snap.dataSource,
+        hourlyBreakdown: snap.hourlyBreakdown,
+        dailyHistory: snap.dailyHistory,
+        diagnostics: snap.diagnostics,
       }));
+
+      if (snap.diagnostics) {
+        setDiagnostics(snap.diagnostics);
+      }
 
       // Load 30-day rolling summaries & compute 7-day baseline
       const rollup = await getDailyTelemetryRollup();
@@ -173,8 +195,14 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       console.warn("[PatientContext] Failed to sync telemetry:", err);
     } finally {
-      setIsSyncing(false);
+      if (!silent) setIsSyncing(false);
     }
+  };
+
+  const handleSetUseDemoData = async (enabled: boolean): Promise<void> => {
+    await setUseDemoBaselineStatus(enabled);
+    setUseDemoDataState(enabled);
+    await syncTelemetryNow(false);
   };
 
   const connectHealth = async (): Promise<boolean> => {
@@ -182,8 +210,9 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     try {
       const granted = await requestHealthPermissions();
       setIsHealthConnected(granted);
+      isConnectedRef.current = granted;
       if (granted) {
-        await syncTelemetryNow();
+        await syncTelemetryNow(false);
       }
       return granted;
     } finally {
@@ -194,6 +223,7 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
   const disconnectHealth = async (): Promise<void> => {
     await setHealthConnectedStatus(false);
     setIsHealthConnected(false);
+    isConnectedRef.current = false;
   };
 
   const updateTelemetry = (partial: Partial<PatientTelemetry>) => {
@@ -204,10 +234,15 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const connected = await getHealthConnectedStatus();
+      const [connected, demoMode] = await Promise.all([
+        getHealthConnectedStatus(),
+        getUseDemoBaselineStatus(),
+      ]);
       if (mounted) {
         setIsHealthConnected(connected);
-        syncTelemetryNow();
+        isConnectedRef.current = connected;
+        setUseDemoDataState(demoMode);
+        syncTelemetryNow(false);
       }
     })();
     return () => {
@@ -215,11 +250,26 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Foreground Auto-Sync (When returning from Samsung Health or Health Connect)
+  // 15-Second Foreground Polling (Silent Background Refresh)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (
+        AppState.currentState === "active" &&
+        isConnectedRef.current &&
+        !useDemoData
+      ) {
+        syncTelemetryNow(true);
+      }
+    }, 15000);
+
+    return () => clearInterval(interval);
+  }, [useDemoData]);
+
+  // Foreground Auto-Sync on AppState resume
   useEffect(() => {
     const handleAppStateChange = (nextAppState: AppStateStatus) => {
       if (nextAppState === "active") {
-        syncTelemetryNow();
+        syncTelemetryNow(true);
       }
     };
 
@@ -238,6 +288,9 @@ export function PatientProvider({ children }: { children: React.ReactNode }) {
         dailyRollup,
         isHealthConnected,
         isSyncing,
+        useDemoData,
+        diagnostics,
+        setUseDemoData: handleSetUseDemoData,
         updateTelemetry,
         connectHealth,
         disconnectHealth,
